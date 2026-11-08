@@ -993,10 +993,40 @@ function renderPendingTeams() {
   container.append(list);
 }
 
+function renderTeamOverview(container) {
+  container.replaceChildren();
+  state.teams.forEach((team, index) => {
+    const card = element('article', 'team-overview-card');
+    card.dataset.id = team.id; card.style.setProperty('--team-color', team.color);
+    const heading = element('div', 'team-overview-card-header');
+    heading.append(element('span', 'team-overview-number', `第 ${index + 1} 队`), element('h3', '', team.name));
+    const score = element('span', 'team-overview-score', team.needsScore ? '待填分数' : `${fmt(team.score)} 分`);
+    const roster = element('div', 'team-overview-roster');
+    for (let slot = 0; slot < 3; slot++) {
+      const member = element('div', 'team-overview-member');
+      const id = team.characterIds[slot];
+      if (id) member.append(portrait(id), element('span', '', characterMap.get(id).name));
+      else member.append(element('span', 'quick-empty-slot', '＋'), element('span', 'muted', '待补选'));
+      roster.append(member);
+    }
+    card.append(heading, score, roster); container.append(card);
+  });
+  if (!state.teams.length) container.append(element('p', 'team-overview-empty muted', '还没有已组好的队伍。'));
+}
+
+function openTeamOverview() {
+  const pending = state.teams.filter(team => team.needsScore).length;
+  $('team-overview-summary').textContent = `${activePlan().name} · 共 ${state.teams.length} 队${pending ? ` · ${pending} 队待填分数` : ''} · 按出场顺序排列`;
+  renderTeamOverview($('team-overview-list'));
+  $('team-overview-dialog').showModal();
+}
+
 function configurePickerMode(quick) {
   $('character-dialog').classList.toggle('quick-mode', quick);
   document.querySelector('.dialog-team-fields').hidden = quick;
   $('quick-team-panel').hidden = !quick;
+  $('quick-team-overview').hidden = !quick;
+  if (quick) renderTeamOverview($('quick-team-overview-list'));
 }
 
 function updateQuickSequence(sequence) {
@@ -1004,7 +1034,7 @@ function updateQuickSequence(sequence) {
   quickSession.history.push([...sequence]); quickSession.cursor++;
   $('character-feedback').textContent = '';
   renderCharacters();
-  $('quick-team-preview').scrollLeft = $('quick-team-preview').scrollWidth;
+  $('quick-team-preview').lastElementChild?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
 function renderQuickPreview() {
@@ -1024,6 +1054,7 @@ function renderQuickPreview() {
       const member = element('div', 'quick-preview-member');
       member.append(element('small', '', `${index * 3 + slot + 1}`));
       member.append(group[slot] ? portrait(group[slot]) : element('span', 'quick-empty-slot', '＋'));
+      member.append(element('span', 'quick-preview-character-name', group[slot] ? characterMap.get(group[slot]).name : '待选择'));
       roster.append(member);
     }
     card.append(roster); $('quick-team-preview').append(card);
@@ -1125,10 +1156,12 @@ function renderCharacters() {
     button.classList.toggle('unavailable', button.disabled);
     button.title = `${entry.name}：可上阵 ${limit} 队，其他队伍已使用 ${owner.length} 次${owner.length ? `（${owner.join('、')}）` : ''}`;
     const image = portrait(entry.id, ''); image.loading = 'lazy';
-    button.append(image, element('span', '', entry.name));
+    const avatar = element('div', 'character-avatar');
+    avatar.append(image);
     const remaining = Math.max(0, limit - owner.length - (selected ? 1 : 0));
-    button.append(element('small', 'availability', sameFamily ? '已选同一角色' : exhausted ? `体力用尽 ${owner.length}/${limit}` : `剩余 ${remaining}/${limit} 体`));
-    if (limit > 1) button.append(element('small', `stamina-badge${season.bonusCharacterIds.includes(entry.id) ? ' temporary' : ''}`, `${limit}体`));
+    avatar.append(element('small', 'availability', sameFamily ? '同一角色已选' : `剩余 ${remaining}/${limit} 体`));
+    if (limit > 1) avatar.append(element('small', `stamina-badge${season.bonusCharacterIds.includes(entry.id) ? ' temporary' : ''}`, `${limit}体`));
+    button.append(avatar, element('span', 'character-choice-name', entry.name));
     button.addEventListener('click', () => {
       if (quickSession) {
         if (sequence.length >= (40 - state.teams.length) * 3) { $('character-feedback').textContent = '已达到 40 支队伍上限。'; return; }
@@ -1216,6 +1249,8 @@ $('confirm-characters').addEventListener('click', () => {
 });
 $('character-dialog').addEventListener('close', () => { pendingTeam = null; quickSession = null; document.body.append($('toast')); $('toast').classList.remove('visible'); });
 $('quick-team').addEventListener('click', openQuickTeams);
+$('team-overview').addEventListener('click', openTeamOverview);
+$('close-team-overview').addEventListener('click', () => $('team-overview-dialog').close());
 $('quick-undo').addEventListener('click', () => { if (quickSession?.cursor > 0) { quickSession.cursor--; $('character-feedback').textContent = ''; renderCharacters(); } });
 $('quick-redo').addEventListener('click', () => { if (quickSession && quickSession.cursor < quickSession.history.length - 1) { quickSession.cursor++; $('character-feedback').textContent = ''; renderCharacters(); } });
 $('quick-reset').addEventListener('click', () => { if (quickSession && quickSequence().length) updateQuickSequence([]); });

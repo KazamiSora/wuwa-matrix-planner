@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>终焉矩阵血线排布 V0.2.1</title>
+  <title>终焉矩阵血线排布 V0.2.2</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="app-header">
-    <a class="brand" href="./"><span class="brand-symbol">M</span><span>终焉矩阵<span class="brand-sub">血线排布 / V0.2.1</span></span></a>
+    <a class="brand" href="./"><span class="brand-symbol">M</span><span>终焉矩阵<span class="brand-sub">血线排布 / V0.2.2</span></span></a>
     <div class="header-actions"><span class="stage-label">终焉矩阵S2-3（S2第三阶段） · 奇点扩张</span><button id="import-button" class="quiet">导入 JSON</button><button id="export-button">导出 JSON <span aria-hidden="true">↗</span></button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
   </header>
   <main>
     <aside class="sidebar">
-      <div class="section-heading"><div><span class="eyebrow">TEAM SETUP</span><h2>我的队伍</h2></div><span id="team-count" class="count">3</span></div>
+      <div class="section-heading"><h2>我的队伍</h2><div class="team-heading-actions"><button id="team-overview" type="button" class="text-button" aria-label="查看队伍一览">一览表</button><span id="team-count" class="count">3</span></div></div>
       <p class="muted intro">三人一队，用得分确定色条长度。</p>
       <div class="stamina-settings">
         <label for="stamina-season">体力期数</label><select id="stamina-season" aria-label="体力期数"></select>
@@ -95,21 +95,33 @@
     <p id="boss-calculation-note" class="muted boss-data-basis"></p>
   </dialog>
   <dialog id="character-dialog">
-    <div class="dialog-header"><div><span class="eyebrow">TEAM SETUP</span><h2><span id="dialog-title">队伍设置</span> <span id="picked-count">0 / 3</span></h2></div><button id="close-dialog" class="quiet" aria-label="关闭角色选择">✕</button></div>
-    <div class="dialog-team-fields">
+    <div class="dialog-header"><h2><span id="dialog-title">队伍设置</span> <span id="picked-count">0 / 3</span></h2><button id="close-dialog" class="quiet" aria-label="关闭角色选择">✕</button></div>
+    <div class="picker-layout">
+      <aside id="quick-team-overview" class="quick-team-overview" hidden aria-label="组队一览">
+        <h3>已组队伍</h3><div id="quick-team-overview-list" class="team-overview-list"></div>
+        <h3 class="quick-draft-heading">本次组队</h3><div id="quick-team-preview" class="quick-team-preview"></div>
+      </aside>
+      <div class="picker-main">
+        <div class="dialog-team-fields">
       <label>队伍名称<input id="dialog-team-name" maxlength="30" autocomplete="off" placeholder="按角色首字生成，可手动修改"></label>
       <label>本队分数<div class="input-unit"><input id="dialog-team-score" type="number" min="0.01" step="any" placeholder="填写本队分数"><span>分</span></div></label>
+        </div>
+        <section id="quick-team-panel" class="quick-team-panel" hidden>
+          <div class="quick-team-toolbar"><span id="quick-team-hint"></span><div><button id="quick-undo" type="button">撤回</button><button id="quick-redo" type="button">恢复</button><button id="quick-reset" type="button">重置</button></div></div>
+        </section>
+        <input id="character-search" class="character-search" placeholder="搜索角色名称…" aria-label="搜索角色名称">
+        <p id="picker-stamina-note" class="picker-stamina-note"></p>
+        <div class="element-filter-row"><div id="element-filters" class="element-filters" role="group" aria-label="角色属性筛选"></div><span id="character-result-count" class="muted"></span></div>
+        <div id="character-grid" class="character-grid"></div>
+        <p id="character-feedback" class="character-feedback" role="status" aria-live="polite"></p>
+      </div>
     </div>
-    <section id="quick-team-panel" class="quick-team-panel" hidden>
-      <div class="quick-team-toolbar"><span id="quick-team-hint"></span><div><button id="quick-undo" type="button">撤回</button><button id="quick-redo" type="button">恢复</button><button id="quick-reset" type="button">重置</button></div></div>
-      <div id="quick-team-preview" class="quick-team-preview"></div>
-    </section>
-    <input id="character-search" class="character-search" placeholder="搜索角色名称…" aria-label="搜索角色名称">
-    <p id="picker-stamina-note" class="picker-stamina-note"></p>
-    <div class="element-filter-row"><div id="element-filters" class="element-filters" role="group" aria-label="角色属性筛选"></div><span id="character-result-count" class="muted"></span></div>
-    <div id="character-grid" class="character-grid"></div>
-    <p id="character-feedback" class="character-feedback" role="status" aria-live="polite"></p>
     <div class="dialog-footer"><span id="picked-names" class="muted"></span><button id="confirm-characters" class="primary">确认选择</button></div>
+  </dialog>
+  <dialog id="team-overview-dialog" class="team-overview-dialog" aria-labelledby="team-overview-title">
+    <div class="dialog-header"><h2 id="team-overview-title">队伍一览</h2><button id="close-team-overview" type="button" class="quiet" aria-label="关闭队伍一览">✕</button></div>
+    <p id="team-overview-summary" class="muted"></p>
+    <div id="team-overview-list" class="team-overview-list"></div>
   </dialog>
   <dialog id="plan-dialog" class="plan-dialog">
     <form id="plan-form">

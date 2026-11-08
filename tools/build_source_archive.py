@@ -32,6 +32,7 @@ REQUIRED_FILES = {
     'data/matrix_content_16.json', 'data/matrix_content_18.json',
     'tools/boss_details_smoke.mjs', 'tools/matrix_plans_smoke.mjs',
     'tools/boss_properties_smoke.mjs', 'tools/pending_delete_smoke.mjs',
+    'tools/picker_overview_smoke.mjs',
     'tests/season-config.test.mjs',
 }
 BROWSER_FILE_LIMIT = 25 * 1024 * 1024
@@ -106,7 +107,9 @@ def upload_guide(version, short_version, core_count, asset_count):
 三、升级自己的排布
 先在旧版逐套导出需要保留的排布 JSON，再从系统托盘选择“退出软件”。将 V{short_version} 完整解压到新目录运行；若旧排布没有自动出现，可在新版本逐套导入 JSON。
 
-本次源码包包含两个赛季的 JSON、增益图标、Boss 特殊性质与搜索、5000 分待填队伍预览、两步队伍删除撤回和恢复、队伍排布库及相关检查脚本；未打包浏览器个人数据、个人排布导出、运行日志或原始网页快照。
+本次源码包包含两个赛季的 JSON、增益图标、Boss 特殊性质与搜索、5000 分待填队伍预览、两步队伍删除撤回和恢复、队伍排布库及相关检查脚本。快捷组队窗口已扩大，体力文字放在头像左上角；主界面可打开“队伍一览”，快捷选人左侧也能查看已有队伍和本次组队草稿。
+
+源码未打包浏览器个人数据、个人排布导出、运行日志或原始网页快照。
 
 GitHub 官方说明：
 上传文件：{UPLOAD_DOC}

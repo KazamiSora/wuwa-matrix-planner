@@ -77,12 +77,12 @@ try {
     $env:MATRIX_URL = $baseUrl
     Push-Location $projectRoot
     try {
-        foreach ($script in @('tools/browser_smoke.mjs','tools/matrix_plans_smoke.mjs','tools/boss_details_smoke.mjs','tools/boss_properties_smoke.mjs','tools/pending_delete_smoke.mjs')) {
+        foreach ($script in @('tools/browser_smoke.mjs','tools/matrix_plans_smoke.mjs','tools/boss_details_smoke.mjs','tools/boss_properties_smoke.mjs','tools/pending_delete_smoke.mjs','tools/picker_overview_smoke.mjs')) {
             & $sourceNode $script
             if ($LASTEXITCODE -ne 0) { throw "Packaged browser checks failed: $script" }
         }
     } finally { Pop-Location }
-    Write-Output "PASS: $($manifest.fileCount) file hashes and sizes; no PATH Node.js; packaged EXE; $displayVersion API and UI; bundled R15 season configs and assets; second launch reuse; full browser, multi-plan and Boss-detail workflows."
+    Write-Output "PASS: $($manifest.fileCount) file hashes and sizes; no PATH Node.js; packaged EXE; $displayVersion API and UI; bundled R15 season configs and assets; second launch reuse; full browser, multi-plan, Boss-detail, enlarged picker and team-overview workflows."
 } finally {
     if ($serverProcessId) {
         try {
