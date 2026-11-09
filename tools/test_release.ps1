@@ -77,7 +77,7 @@ try {
     $env:MATRIX_URL = $baseUrl
     Push-Location $projectRoot
     try {
-        foreach ($script in @('tools/browser_smoke.mjs','tools/matrix_plans_smoke.mjs','tools/boss_details_smoke.mjs','tools/boss_properties_smoke.mjs','tools/pending_delete_smoke.mjs','tools/picker_overview_smoke.mjs')) {
+        foreach ($script in @('tools/browser_smoke.mjs','tools/matrix_plans_smoke.mjs','tools/boss_details_smoke.mjs','tools/boss_properties_smoke.mjs','tools/pending_delete_smoke.mjs','tools/picker_overview_smoke.mjs','tools/score_table_migration_smoke.mjs','tools/features_1_2_smoke.mjs','tools/picker_animation_smoke.mjs','tools/drag_preview_smoke.mjs','tools/pinyin_search_smoke.mjs','tools/rover_merge_smoke.mjs','tools/picker_order_sidebar_smoke.mjs')) {
             & $sourceNode $script
             if ($LASTEXITCODE -ne 0) { throw "Packaged browser checks failed: $script" }
         }

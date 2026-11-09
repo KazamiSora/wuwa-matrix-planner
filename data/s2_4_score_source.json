@@ -1,0 +1,360 @@
+{
+  "version": 1,
+  "seasonId": "s2-phase4",
+  "provenance": "user-provided-image",
+  "providedRounds": 9,
+  "notes": "R1—R9 血量、每只 Boss 整数分数与累计分数按用户最新图片；普通怪和宝箱分别沿用既有伤害系数，单只伤害积分向下取整，宝箱击杀另加1000分，再逐只累加。S2-3 按相同轮次、相同出场位次类比同步。",
+  "bossOrder": [
+    "飞廉之猩",
+    "达妮娅",
+    "无冠者",
+    "辛吉勒姆",
+    "矩阵奇藏"
+  ],
+  "hpRows": [
+    {
+      "round": 1,
+      "position": 1,
+      "maxHp": 5612519,
+      "fullPoints": 4680,
+      "cumulativePoints": 4680
+    },
+    {
+      "round": 1,
+      "position": 2,
+      "maxHp": 5612519,
+      "fullPoints": 4680,
+      "cumulativePoints": 9360
+    },
+    {
+      "round": 1,
+      "position": 3,
+      "maxHp": 5612519,
+      "fullPoints": 4680,
+      "cumulativePoints": 14040
+    },
+    {
+      "round": 1,
+      "position": 4,
+      "maxHp": 5612519,
+      "fullPoints": 4680,
+      "cumulativePoints": 18720
+    },
+    {
+      "round": 1,
+      "position": 5,
+      "maxHp": 6173771,
+      "fullPoints": 6667,
+      "cumulativePoints": 25387
+    },
+    {
+      "round": 2,
+      "position": 1,
+      "maxHp": 9541514,
+      "fullPoints": 9159,
+      "cumulativePoints": 34546
+    },
+    {
+      "round": 2,
+      "position": 2,
+      "maxHp": 9541514,
+      "fullPoints": 9159,
+      "cumulativePoints": 43705
+    },
+    {
+      "round": 2,
+      "position": 3,
+      "maxHp": 9541514,
+      "fullPoints": 9159,
+      "cumulativePoints": 52864
+    },
+    {
+      "round": 2,
+      "position": 4,
+      "maxHp": 9541514,
+      "fullPoints": 9159,
+      "cumulativePoints": 62023
+    },
+    {
+      "round": 2,
+      "position": 5,
+      "maxHp": 12756094,
+      "fullPoints": 14457,
+      "cumulativePoints": 76480
+    },
+    {
+      "round": 3,
+      "position": 1,
+      "maxHp": 19388951,
+      "fullPoints": 20222,
+      "cumulativePoints": 96702
+    },
+    {
+      "round": 3,
+      "position": 2,
+      "maxHp": 19388951,
+      "fullPoints": 20222,
+      "cumulativePoints": 116924
+    },
+    {
+      "round": 3,
+      "position": 3,
+      "maxHp": 19388951,
+      "fullPoints": 20222,
+      "cumulativePoints": 137146
+    },
+    {
+      "round": 3,
+      "position": 4,
+      "maxHp": 19388951,
+      "fullPoints": 20222,
+      "cumulativePoints": 157368
+    },
+    {
+      "round": 3,
+      "position": 5,
+      "maxHp": 19388951,
+      "fullPoints": 23239,
+      "cumulativePoints": 180607
+    },
+    {
+      "round": 4,
+      "position": 1,
+      "maxHp": 20358398.55,
+      "fullPoints": 21233,
+      "cumulativePoints": 201840
+    },
+    {
+      "round": 4,
+      "position": 2,
+      "maxHp": 21327846.1,
+      "fullPoints": 22244,
+      "cumulativePoints": 224084
+    },
+    {
+      "round": 4,
+      "position": 3,
+      "maxHp": 22297293.65,
+      "fullPoints": 23256,
+      "cumulativePoints": 247340
+    },
+    {
+      "round": 4,
+      "position": 4,
+      "maxHp": 23266741.2,
+      "fullPoints": 24267,
+      "cumulativePoints": 271607
+    },
+    {
+      "round": 4,
+      "position": 5,
+      "maxHp": 24236188.75,
+      "fullPoints": 28798,
+      "cumulativePoints": 300405
+    },
+    {
+      "round": 5,
+      "position": 1,
+      "maxHp": 25205636.3,
+      "fullPoints": 26289,
+      "cumulativePoints": 326694
+    },
+    {
+      "round": 5,
+      "position": 2,
+      "maxHp": 26175083.85,
+      "fullPoints": 27300,
+      "cumulativePoints": 353994
+    },
+    {
+      "round": 5,
+      "position": 3,
+      "maxHp": 27144531.4,
+      "fullPoints": 28311,
+      "cumulativePoints": 382305
+    },
+    {
+      "round": 5,
+      "position": 4,
+      "maxHp": 28113978.95,
+      "fullPoints": 29322,
+      "cumulativePoints": 411627
+    },
+    {
+      "round": 5,
+      "position": 5,
+      "maxHp": 29083426.5,
+      "fullPoints": 34358,
+      "cumulativePoints": 445985
+    },
+    {
+      "round": 6,
+      "position": 1,
+      "maxHp": 30052874.05,
+      "fullPoints": 31345,
+      "cumulativePoints": 477330
+    },
+    {
+      "round": 6,
+      "position": 2,
+      "maxHp": 31022321.6,
+      "fullPoints": 32356,
+      "cumulativePoints": 509686
+    },
+    {
+      "round": 6,
+      "position": 3,
+      "maxHp": 31991769.15,
+      "fullPoints": 33367,
+      "cumulativePoints": 543053
+    },
+    {
+      "round": 6,
+      "position": 4,
+      "maxHp": 32961216.7,
+      "fullPoints": 34378,
+      "cumulativePoints": 577431
+    },
+    {
+      "round": 6,
+      "position": 5,
+      "maxHp": 33930664.25,
+      "fullPoints": 39918,
+      "cumulativePoints": 617349
+    },
+    {
+      "round": 7,
+      "position": 1,
+      "maxHp": 34900111.8,
+      "fullPoints": 36400,
+      "cumulativePoints": 653749
+    },
+    {
+      "round": 7,
+      "position": 2,
+      "maxHp": 35869559.35,
+      "fullPoints": 37411,
+      "cumulativePoints": 691160
+    },
+    {
+      "round": 7,
+      "position": 3,
+      "maxHp": 36839006.9,
+      "fullPoints": 38423,
+      "cumulativePoints": 729583
+    },
+    {
+      "round": 7,
+      "position": 4,
+      "maxHp": 37808454.45,
+      "fullPoints": 39434,
+      "cumulativePoints": 769017
+    },
+    {
+      "round": 7,
+      "position": 5,
+      "maxHp": 38777902,
+      "fullPoints": 45478,
+      "cumulativePoints": 814495
+    },
+    {
+      "round": 8,
+      "position": 1,
+      "maxHp": 39747349.55,
+      "fullPoints": 41456,
+      "cumulativePoints": 855951
+    },
+    {
+      "round": 8,
+      "position": 2,
+      "maxHp": 40716797.1,
+      "fullPoints": 42467,
+      "cumulativePoints": 898418
+    },
+    {
+      "round": 8,
+      "position": 3,
+      "maxHp": 41686244.65,
+      "fullPoints": 43478,
+      "cumulativePoints": 941896
+    },
+    {
+      "round": 8,
+      "position": 4,
+      "maxHp": 42655692.2,
+      "fullPoints": 44489,
+      "cumulativePoints": 986385
+    },
+    {
+      "round": 8,
+      "position": 5,
+      "maxHp": 43625139.75,
+      "fullPoints": 51038,
+      "cumulativePoints": 1037423
+    },
+    {
+      "round": 9,
+      "position": 1,
+      "maxHp": 44594587.3,
+      "fullPoints": 46512,
+      "cumulativePoints": 1083935
+    },
+    {
+      "round": 9,
+      "position": 2,
+      "maxHp": 45564034.85,
+      "fullPoints": 47523,
+      "cumulativePoints": 1131458
+    },
+    {
+      "round": 9,
+      "position": 3,
+      "maxHp": 46533482.4,
+      "fullPoints": 48534,
+      "cumulativePoints": 1179992
+    },
+    {
+      "round": 9,
+      "position": 4,
+      "maxHp": 47502929.95,
+      "fullPoints": 49545,
+      "cumulativePoints": 1229537
+    },
+    {
+      "round": 9,
+      "position": 5,
+      "maxHp": 48472377.5,
+      "fullPoints": 56597,
+      "cumulativePoints": 1286134
+    }
+  ],
+  "damageRules": [
+    {
+      "fromRound": 1,
+      "normal": 0.000834,
+      "chest": 0.000918
+    },
+    {
+      "fromRound": 2,
+      "normal": 0.00096,
+      "chest": 0.001055
+    },
+    {
+      "fromRound": 3,
+      "normal": 0.001043,
+      "chest": 0.001147
+    }
+  ],
+  "chestKillBonus": 1000,
+  "projection": {
+    "fromRound": 10,
+    "maxRound": 15,
+    "hpPerWave": 969447.55,
+    "basis": "derived-from-provided-R4-to-R9-HP; higher rounds remain inferred"
+  },
+  "applicableSeasons": [
+    "s2-phase4",
+    "s2-phase3"
+  ],
+  "rounding": "floor-per-boss"
+}

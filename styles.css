@@ -465,3 +465,108 @@ input[readonly] { color: #94a6b5; border-style: dashed; cursor: default; }
   #character-dialog.quick-mode .quick-team-panel { margin-bottom: 5px; padding: 5px 7px; }
   #character-dialog.quick-mode .picker-stamina-note { margin-bottom: 4px; }
 }
+
+/* Target shortfall and compact three-column quick-team overview. */
+#target-score-gap { flex: 0 1 auto; margin-left: auto; max-width: 100%; padding: 7px 11px; border: 1px solid #756140; border-radius: 5px; color: #edc988; background: #e6bd790a; font-size: 12px; line-height: 1.7; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#target-score-gap[hidden] { display: none; }
+#target-score-gap strong { font-size: 14px; color: #ffdda2; font-weight: 650; }
+#target-score-gap .gap-pending-note { display: block; margin-top: 2px; color: #a9b7c4; font-size: 10px; }
+#target-score-gap[data-status="reached"], #target-score-gap[data-status="exceeded"] { color: #9dd0b2; border-color: #4b7861; background: #79c8a00a; }
+#target-score-gap[data-status="reached"] strong, #target-score-gap[data-status="exceeded"] strong { color: #b5e5c9; }
+.picker-meta-row { display: flex; flex-direction: column; min-width: 0; }
+#character-dialog:not(.quick-mode) .picker-meta-row .character-search { order: -1; width: 100%; }
+#character-dialog.quick-mode .picker-meta-row { display: grid; grid-template-columns: minmax(170px,max-content) minmax(120px,1fr) max-content; align-items: center; gap: 10px; margin-bottom: 12px; }
+#character-dialog.quick-mode .picker-meta-row .picker-stamina-note { min-width: 0; margin: 0; line-height: 1.7; }
+#character-dialog.quick-mode .picker-meta-row .character-search { width: 100%; min-width: 0; margin: 0; padding: 8px 10px; }
+#character-dialog.quick-mode .picker-meta-row .quick-team-panel { min-width: 0; padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; }
+#character-dialog.quick-mode .picker-meta-row .quick-team-toolbar { display: block; }
+#character-dialog.quick-mode .picker-meta-row .quick-team-toolbar > div { margin: 0; gap: 5px; }
+#character-dialog.quick-mode .picker-meta-row .quick-team-toolbar button { padding: 6px 9px; white-space: nowrap; }
+.quick-team-overview .team-overview-list, .quick-team-overview .quick-team-preview { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; flex-shrink: 0; }
+.quick-team-overview .team-overview-card, .quick-team-overview .quick-preview-team { min-width: 0; padding: 8px 6px; }
+.quick-team-overview .team-overview-card-header { gap: 3px; margin-bottom: 5px; }
+.quick-team-overview .team-overview-card-header > h3 { font-size: 10px; }
+.quick-team-overview .team-overview-card-header > span { font-size: 9px; }
+.quick-team-overview .team-overview-score { margin-bottom: 6px; font-size: 9px; }
+.quick-team-overview .team-overview-roster, .quick-team-overview .quick-preview-roster { gap: 3px; }
+.quick-team-overview .team-overview-member, .quick-team-overview .quick-preview-member { gap: 0; }
+.quick-team-overview .team-overview-member .portrait, .quick-team-overview .quick-preview-member .portrait, .quick-team-overview .quick-empty-slot { width: 32px; height: 32px; }
+.quick-team-overview .team-overview-member > span:not(.quick-empty-slot), .quick-team-overview .quick-preview-character-name { display: none; }
+.quick-team-overview .quick-preview-team > strong { display: block; font-size: 10px; line-height: 1.6; overflow-wrap: anywhere; }
+.quick-team-overview .quick-preview-roster { margin-top: 7px; }
+.quick-team-overview .quick-team-preview > p { grid-column: 1/-1; }
+@media(min-width:761px) {
+  #character-dialog.quick-mode[open] > .picker-layout { grid-template-columns: 420px minmax(0,1fr); gap: 18px; }
+  #character-dialog.quick-mode[open] .character-grid { grid-template-columns: repeat(10,minmax(0,1fr)); }
+}
+@media(min-width:1700px) {
+  #character-dialog.quick-mode[open] > .picker-layout { grid-template-columns: 440px minmax(0,1fr); }
+  #character-dialog.quick-mode[open] .character-grid { grid-template-columns: repeat(12,minmax(0,1fr)); }
+}
+@media(max-width:1150px) and (min-width:761px) {
+  #character-dialog.quick-mode[open] > .picker-layout { grid-template-columns: 342px minmax(0,1fr); gap: 14px; }
+  #character-dialog.quick-mode[open] .character-grid { grid-template-columns: repeat(8,minmax(0,1fr)); }
+  .quick-team-overview .team-overview-member .portrait, .quick-team-overview .quick-preview-member .portrait, .quick-team-overview .quick-empty-slot { width: 25px; height: 25px; }
+  #character-dialog.quick-mode .picker-meta-row { grid-template-columns: minmax(0,1fr) max-content; gap: 7px; }
+  #character-dialog.quick-mode .picker-meta-row .picker-stamina-note { grid-column: 1/-1; }
+}
+@media(max-width:950px) and (min-width:761px) {
+  #character-dialog.quick-mode[open] .character-grid { grid-template-columns: repeat(6,minmax(0,1fr)); }
+}
+@media(max-width:760px) {
+  #target-score-gap { flex-basis: 100%; margin-left: 0; padding: 6px 9px; font-size: 11px; }
+  #target-score-gap strong { font-size: 13px; }
+  #character-dialog.quick-mode .picker-meta-row { grid-template-columns: minmax(0,1fr) max-content; gap: 7px; margin-bottom: 9px; }
+  #character-dialog.quick-mode .picker-meta-row .picker-stamina-note { grid-column: 1/-1; }
+  #character-dialog.quick-mode .picker-meta-row .character-search { padding: 7px 8px; font-size: 11px; }
+  #character-dialog.quick-mode .picker-meta-row .quick-team-toolbar > div { gap: 4px; }
+  #character-dialog.quick-mode .picker-meta-row .quick-team-toolbar button { padding: 6px 7px; font-size: 10px; }
+  .quick-team-overview .team-overview-card, .quick-team-overview .quick-preview-team { padding: 7px 5px; }
+  .quick-team-overview .team-overview-member .portrait, .quick-team-overview .quick-preview-member .portrait, .quick-team-overview .quick-empty-slot { width: 26px; height: 26px; }
+}
+@media(max-width:360px) {
+  .quick-team-overview .team-overview-card, .quick-team-overview .quick-preview-team { padding: 6px 4px; }
+  .quick-team-overview .team-overview-roster, .quick-team-overview .quick-preview-roster { gap: 2px; }
+  .quick-team-overview .team-overview-member .portrait, .quick-team-overview .quick-preview-member .portrait, .quick-team-overview .quick-empty-slot { width: 20px; height: 20px; }
+}
+
+/* Roomier pickers and an avatar flight inside the dialog's top layer. */
+#character-dialog:not(.quick-mode) { width: 880px; }
+#character-dialog:not(.quick-mode) .character-grid { grid-template-columns: repeat(10,minmax(0,1fr)); }
+#character-dialog.quick-mode[open] { width: min(1740px,calc(100vw - 24px)); max-width: calc(100vw - 24px); height: 96dvh; max-height: 96dvh; padding: 16px; }
+.picker-selection-summary { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+#picker-selected-roster { display: flex; gap: 7px; }
+#picker-selected-roster[hidden] { display: none; }
+#picker-selected-roster .portrait { width: 32px; height: 32px; border-radius: 5px; }
+.picker-flying-portrait { position: fixed; z-index: 100; pointer-events: none; object-fit: cover; border: 1px solid #edc77e; border-radius: 6px; box-shadow: 0 4px 16px #0008; transform-origin: top left; will-change: transform; }
+@media(min-width:1151px) {
+  #character-dialog.quick-mode[open] .character-grid { grid-template-columns: repeat(12,minmax(0,1fr)); gap: 7px; }
+}
+@media(min-width:1700px) {
+  #character-dialog.quick-mode[open] .character-grid { grid-template-columns: repeat(16,minmax(0,1fr)); }
+}
+@media(max-width:760px) {
+  #character-dialog:not(.quick-mode) { width: calc(100vw - 16px); max-width: calc(100vw - 16px); padding: 16px; }
+  #character-dialog:not(.quick-mode) .character-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+  #character-dialog.quick-mode[open] { width: calc(100vw - 12px); max-width: calc(100vw - 12px); height: 97dvh; max-height: 97dvh; padding: 12px; }
+  .picker-selection-summary { flex: 1; }
+  #picker-selected-roster .portrait { width: 26px; height: 26px; }
+  #character-dialog:not(.quick-mode) .dialog-footer { gap: 10px; }
+}
+
+.picker-awaiting-arrival { opacity: 0 !important; }
+.quick-preview-member:has(.picker-awaiting-arrival) { background: #e6bd7910; border-radius: 6px; }
+.drag-preview-active .team-bar { transition: left 180ms cubic-bezier(.2,.65,.3,1), box-shadow 140ms; }
+.axis-guide.drag-preview-guide { transition: left 180ms cubic-bezier(.2,.65,.3,1); }
+.drag-preview-active .team-bar.is-reordering { z-index: 4; box-shadow: 0 0 0 2px var(--team-color),0 5px 16px #0008; filter: brightness(1.15); }
+@media(prefers-reduced-motion:reduce) { .drag-preview-active .team-bar, .axis-guide.drag-preview-guide { transition: none; } }
+
+#team-list .team-card { touch-action: none; user-select: none; cursor: grab; }
+#team-list.sidebar-drag-preview .team-card { transition: transform 180ms cubic-bezier(.2,.65,.3,1); }
+#team-list .sidebar-is-dragging { position: relative; z-index: 2; border-color: var(--team-color); box-shadow: 0 0 0 1px var(--team-color),0 4px 10px #0008; cursor: grabbing; }
+#quick-shortcut-hint { display: none; }
+#character-dialog.quick-mode .picker-selection-summary { flex-direction: row; align-items: center; flex-wrap: wrap; column-gap: 16px; row-gap: 5px; }
+#character-dialog.quick-mode #quick-shortcut-hint { display: inline-flex; flex-wrap: wrap; gap: 5px 12px; font-size: 11px; line-height: 1.8; }
+#quick-shortcut-hint > span { white-space: nowrap; }
+#quick-shortcut-hint kbd { font: inherit; color: #dfc89f; }
+@media(prefers-reduced-motion:reduce) { #team-list.sidebar-drag-preview .team-card { transition: none; } }

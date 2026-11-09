@@ -55,6 +55,7 @@ function validateSeason(season, registryId) {
   }
   const scoring = season.scoring;
   requireValue(scoring && ['source-and-inferred', 'provisional'].includes(scoring.status) && nonempty(scoring.basis) && nonempty(scoring.basedOnSeason), `${registryId} 的计分来源无效`);
+  if (scoring.rounding !== undefined) requireValue(scoring.rounding === 'floor-per-boss', `${registryId} 的计分取整规则无效`);
   requireValue(Array.isArray(scoring.waves) && scoring.waves.length === season.maxRound * season.bosses.length, `${registryId} 的波次数与轮次不一致`);
   scoring.waves.forEach((wave, index) => {
     const round = Math.floor(index / season.bosses.length) + 1;
@@ -64,6 +65,7 @@ function validateSeason(season, registryId) {
     requireValue(typeof wave.inferred === 'boolean', `${registryId} 的推算标记无效`);
     requireValue(wave.sourceCell === null || nonempty(wave.sourceCell), `${registryId} 的原表单元格无效`);
     requireValue(wave.formula === null || nonempty(wave.formula), `${registryId} 的公式无效`);
+    if (wave.pointsPerDamage !== undefined) requireValue(Number.isFinite(wave.pointsPerDamage) && wave.pointsPerDamage > 0, `${registryId} 的伤害计分系数必须为正数`);
     if (wave.maxHp !== undefined || wave.hpStatus !== undefined) {
       requireValue(['source', 'inferred', 'provisional', 'unconfirmed'].includes(wave.hpStatus), `${registryId} 的总血量状态无效`);
       requireValue(wave.hpStatus === 'unconfirmed' ? wave.maxHp === null : Number.isFinite(wave.maxHp) && wave.maxHp > 0, `${registryId} 的总血量必须为正数，待确认时填 null`);
@@ -137,6 +139,9 @@ export function buildSeasonScores(seasonOrId = registry.defaultSeason) {
       damage_points_at_full_hp: wave.fullPoints - wave.killBonus,
       full_kill_points: wave.fullPoints, kill_bonus: wave.killBonus,
       max_hp: wave.maxHp ?? null, hp_status: wave.hpStatus ?? 'unconfirmed',
+      ...(wave.pointsPerDamage !== undefined ? { points_per_damage: wave.pointsPerDamage } : {}),
+      source_label: season.scoring.sourceLabel || '原表',
+      ...(season.scoring.rounding ? { score_rounding: season.scoring.rounding } : {}),
       cumulative_points_before: before, cumulative_points_after: cumulative,
       estimated: wave.inferred,
       provisional: season.scoring.status === 'provisional',

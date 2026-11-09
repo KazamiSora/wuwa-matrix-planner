@@ -1,0 +1,63 @@
+import assert from 'node:assert/strict';
+import { readFile, mkdir } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const { chromium } = await import(pathToFileURL(path.join(os.homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs')).href);
+const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1050 } });
+const errors = []; page.on('pageerror', error => errors.push(error.message));
+const config = () => page.evaluate(() => { const library = JSON.parse(localStorage.getItem('wuwa-matrix-plan-library-v1')); return library.plans.find(plan => plan.id === library.activePlanId).config; });
+const names = () => page.locator('.character-choice').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')));
+const prefix = '守岸人|莫宁|穗穗|维里奈|卜灵|白芷|心|锁暝|清宵|达妮娅|陆·赫斯|秧秧·玄翎|千咲|露西|丽贝卡|绯雪|洛瑟菈|西格莉卡|仇远|爱弥斯|琳奈|嘉贝莉娜|露帕|景燃|长离|布兰特|安可|奥古斯塔|尤诺|鉴心|弗洛洛|坎特蕾拉|洛可可|椿|卡提希娅|夏空|赞妮|菲比|珂莱塔|折枝|相里要|吟霖|卡卡罗|今汐|渊武'.split('|');
+async function moveFirst() {
+  const node = page.locator('.team-card').first(); await node.scrollIntoViewIfNeeded();
+  const box = await node.boundingBox();
+  await page.mouse.move(box.x + 55, box.y + box.height / 2); await page.mouse.down();
+  await page.mouse.move(box.x + 55, box.y + box.height / 2 + 170, { steps: 8 });
+  await page.waitForTimeout(210);
+}
+try {
+  await mkdir('outputs', { recursive: true });
+  await page.goto(process.env.MATRIX_URL || 'http://127.0.0.1:4173');
+  await page.locator('#quick-team').click();
+  const ordered = await names();
+  assert.deepEqual(ordered.slice(0, prefix.length), prefix);
+  assert.deepEqual(ordered.slice(-4), ['漂泊者·气动', '漂泊者·衍射', '漂泊者·导电', '漂泊者·湮灭']);
+  assert.equal(new Set(ordered).size, ordered.length);
+  await page.locator('#character-dialog').screenshot({ path: 'outputs/fixed-picker-order.png' });
+  await page.locator('#character-search').fill('jinxi'); assert.deepEqual(await names(), ['今汐']);
+  await page.locator('#character-search').fill('');
+  await page.getByRole('button', { name: '热熔', exact: true }).click();
+  assert.ok(await page.locator('.character-choice').evaluateAll(nodes => nodes.every(node => node.dataset.element === '2')));
+  await page.getByRole('button', { name: '全部', exact: true }).click(); assert.deepEqual(await names(), ordered);
+  await page.keyboard.press('Escape');
+  const original = await config();
+  await moveFirst();
+  assert.deepEqual((await config()).teams, original.teams);
+  const expected = [original.teams[1].id, original.teams[2].id, original.teams[0].id];
+  const visual = await page.locator('.team-card').evaluateAll(nodes => nodes.map(node => ({ id: node.dataset.id, y: node.getBoundingClientRect().top })).sort((a, b) => a.y - b.y).map(item => item.id));
+  assert.deepEqual(visual, expected);
+  assert.deepEqual(await page.locator('.team-bar').evaluateAll(nodes => nodes.map(node => ({ id: node.dataset.id, x: parseFloat(node.style.left) })).sort((a, b) => a.x - b.x).map(item => item.id)), expected);
+  await page.screenshot({ path: 'outputs/sidebar-drag-preview.png' });
+  await page.keyboard.press('Escape'); await page.mouse.up();
+  assert.deepEqual((await config()).teams, original.teams);
+  assert.equal(await page.locator('.sidebar-drag-preview').count(), 0);
+  await moveFirst(); await page.mouse.up();
+  assert.deepEqual((await config()).teams.map(team => team.id), expected);
+  assert.deepEqual((await config()).teams.map(team => team.score).sort((a,b) => a-b), original.teams.map(team => team.score).sort((a,b) => a-b));
+  await page.reload(); await page.locator('.team-card').first().waitFor();
+  assert.deepEqual((await config()).teams.map(team => team.id), expected);
+  const pending = JSON.parse(await readFile('config/demo.json', 'utf8')); pending.teams[0].score = 0; pending.teams[0].needsScore = true;
+  let cursor = 0; for (const team of pending.teams) { team.startScore = cursor; cursor += team.score; }
+  await page.locator('#import-file').setInputFiles({ name: 'sidebar-pending.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(pending)) });
+  await page.locator('.pending-score-bar').waitFor();
+  await moveFirst(); await page.locator('.sidebar-is-dragging').dispatchEvent('pointercancel'); await page.mouse.up();
+  assert.deepEqual((await config()).teams.map(team => team.id), pending.teams.map(team => team.id));
+  await moveFirst(); await page.mouse.up();
+  const result = await config();
+  assert.equal(result.teams.at(-1).score, 0); assert.equal(result.teams.at(-1).needsScore, true);
+  assert.equal(await page.locator('.sidebar-is-dragging').count(), 0);
+  assert.deepEqual(errors, []);
+  console.log('PASS: exact requested roster order, fixed Rover tail, filters/search, live sidebar/axis preview, commit/cancel/reload, and zero-score pending preservation.');
+} finally { await browser.close(); }

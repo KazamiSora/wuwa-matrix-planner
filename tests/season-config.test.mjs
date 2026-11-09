@@ -9,7 +9,29 @@ import { seasonDefinitions, getSeason, seasonStaminaRules, buildSeasonScores } f
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const readJson = relative => JSON.parse(readFileSync(new URL(`../${relative}`, import.meta.url), 'utf8'));
-const source = readJson('data/scores.json');
+const tableHpRows = [
+  ['5612519', '5612519', '5612519', '5612519', '6173771'],
+  ['9541514', '9541514', '9541514', '9541514', '12756094'],
+  ['19388951', '19388951', '19388951', '19388951', '19388951'],
+  ['20358398.55', '21327846.1', '22297293.65', '23266741.2', '24236188.75'],
+  ['25205636.3', '26175083.85', '27144531.4', '28113978.95', '29083426.5'],
+  ['30052874.05', '31022321.6', '31991769.15', '32961216.7', '33930664.25'],
+  ['34900111.8', '35869559.35', '36839006.9', '37808454.45', '38777902'],
+  ['39747349.55', '40716797.1', '41686244.65', '42655692.2', '43625139.75'],
+  ['44594587.3', '45564034.85', '46533482.4', '47502929.95', '48472377.5'],
+].flat().map(value => {
+  const [whole, fraction = ''] = value.split('.');
+  return BigInt(whole) * 100n + BigInt((fraction + '00').slice(0, 2));
+});
+function expectedLatest(index) {
+  const hpCents = index < 45 ? tableHpRows[index] : tableHpRows.at(-1) + 96944755n * BigInt(index - 44);
+  const round = Math.floor(index / 5) + 1, chest = index % 5 === 4;
+  const coefficient = [[834, 918], [960, 1055], [1043, 1147]][Math.min(round, 3) - 1][Number(chest)];
+  const damageUnits = hpCents * BigInt(coefficient), bonus = chest ? 1000 : 0;
+  const damage = Number(damageUnits / 100000000n);
+  return { hp: Number(hpCents) / 100, coefficient: coefficient / 1e6, damage, bonus, total: damage + bonus };
+}
+const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-7, `${actual} differs from ${expected}`);
 
 test('registry supplies concrete identities and legacy tower-ID lookup without period mismatch', () => {
   assert.equal(seasonDefinitions.length, 2);
@@ -28,31 +50,57 @@ test('registry supplies concrete identities and legacy tower-ID lookup without p
   assert.throws(() => getSeason({ matrixSeason: 's2-phase3', towerId: 18 }), /不匹配/);
 });
 
-test('both 75-wave score schedules preserve corresponding S2-3 points and recompute cumulative totals', () => {
+const providedScores = [
+  [4680, 4680, 4680, 4680, 6667], [9159, 9159, 9159, 9159, 14457],
+  [20222, 20222, 20222, 20222, 23239], [21233, 22244, 23256, 24267, 28798],
+  [26289, 27300, 28311, 29322, 34358], [31345, 32356, 33367, 34378, 39918],
+  [36400, 37411, 38423, 39434, 45478], [41456, 42467, 43478, 44489, 51038],
+  [46512, 47523, 48534, 49545, 56597],
+].flat();
+const providedCumulative = [
+  [4680, 9360, 14040, 18720, 25387], [34546, 43705, 52864, 62023, 76480],
+  [96702, 116924, 137146, 157368, 180607], [201840, 224084, 247340, 271607, 300405],
+  [326694, 353994, 382305, 411627, 445985], [477330, 509686, 543053, 577431, 617349],
+  [653749, 691160, 729583, 769017, 814495], [855951, 898418, 941896, 986385, 1037423],
+  [1083935, 1131458, 1179992, 1229537, 1286134],
+].flat();
+
+test('both seasons use every integer score and cumulative total from the latest image table', () => {
   const original = buildSeasonScores('s2-phase3');
-  const provisional = buildSeasonScores('s2-phase4');
-  assert.equal(original.records.length, 75);
-  assert.equal(provisional.records.length, 75);
-  let cumulative = 0;
-  for (let index = 0; index < 75; index++) {
-    const wave = original.records[index], borrowed = provisional.records[index];
-    assert.equal(wave.full_kill_points, source.records[index].full_kill_points);
-    assert.equal(wave.kill_bonus, source.records[index].kill_bonus);
-    assert.equal(borrowed.full_kill_points, wave.full_kill_points);
-    assert.equal(borrowed.kill_bonus, wave.kill_bonus);
-    assert.equal(wave.cumulative_points_before, cumulative);
-    assert.equal(borrowed.cumulative_points_before, cumulative);
-    cumulative += wave.full_kill_points;
-    assert.equal(wave.cumulative_points_after, cumulative);
-    assert.equal(borrowed.cumulative_points_after, cumulative);
-    assert.equal(wave.provisional, false);
-    assert.equal(borrowed.provisional, true);
-    assert.equal(borrowed.score_reference_season, 's2-phase3');
-    assert.equal(borrowed.source_cell, null);
+  const updated = buildSeasonScores('s2-phase4');
+  for (const [table, label] of [[original, '同位次类比'], [updated, '用户提供']]) {
+    assert.equal(table.records.length, 75);
+    let cumulative = 0;
+    for (let index = 0; index < 75; index++) {
+      const wave = table.records[index], expected = expectedLatest(index);
+      assert.equal(wave.full_kill_points, expected.total);
+      assert.equal(wave.damage_points_at_full_hp, expected.damage);
+      assert.equal(wave.kill_bonus, expected.bonus);
+      assert.equal(wave.points_per_damage, expected.coefficient);
+      assert.equal(wave.cumulative_points_before, cumulative);
+      cumulative += expected.total;
+      assert.equal(wave.cumulative_points_after, cumulative);
+      if (index < 45) {
+        assert.equal(wave.full_kill_points, providedScores[index]);
+        assert.equal(wave.cumulative_points_after, providedCumulative[index]);
+      }
+      assert.equal(wave.provisional, false);
+      assert.equal(wave.estimated, index >= 45);
+      assert.equal(wave.score_reference_season, 's2-phase4');
+      assert.equal(wave.source_label, label);
+      assert.equal(wave.source_cell, null);
+    }
+    assert.equal(table.records.filter(wave => wave.estimated).length, 30);
+    assert.equal(table.scoring_status, 'source-and-inferred');
   }
-  assert.equal(original.records.filter(wave => wave.estimated).length, 33);
-  assert.equal(provisional.records.filter(wave => wave.estimated).length, 33);
-  assert.match(provisional.basis, /暂按S2-3相同出场位次沿用.*尚未实测/);
+  assert.equal(getSeason('s2-phase3').scoring.rounding, 'floor-per-boss');
+  assert.equal(getSeason('s2-phase4').scoring.rounding, 'floor-per-boss');
+  assert.equal(original.records[44].cumulative_points_after, 1286134);
+  assert.equal(updated.records[44].cumulative_points_after, 1286134);
+  assert.equal(original.records[0].name, '燎照之骑');
+  assert.equal(updated.records[0].name, '飞廉之猩');
+  assert.match(original.basis, /类比/);
+  assert.match(updated.basis, /用户/);
 });
 
 test('S2-4 repeats the exact published boss order and all configured assets exist locally', () => {
@@ -103,29 +151,23 @@ test('definitions are deeply frozen and generated records are independent mutabl
   const built = buildSeasonScores('s2-phase3');
   built.records[0].full_kill_points = 7;
   built.records[0].name = '修改副本';
-  assert.equal(buildSeasonScores('s2-phase3').records[0].full_kill_points, source.records[0].full_kill_points);
+  assert.equal(buildSeasonScores('s2-phase3').records[0].full_kill_points, expectedLatest(0).total);
   assert.equal(getSeason('s2-phase3').bosses[0].name, '燎照之骑');
 });
 
-test('physical HP provenance is independent of score provenance and S2-4 explicitly borrows same-position HP as provisional', () => {
-  const phase3 = buildSeasonScores('s2-phase3').records;
-  assert.equal(phase3[0].max_hp, 5612519);
-  assert.equal(phase3[4].max_hp, 6173771);
-  assert.equal(phase3[5].max_hp, 9541514);
-  assert.equal(phase3[9].max_hp, 12756094);
-  assert.equal(phase3[10].max_hp, 19388951);
-  assert.ok(phase3.slice(0, 15).every(wave => wave.hp_status === 'source'));
-  assert.ok(phase3.slice(15).every(wave => wave.hp_status === 'inferred'));
-  assert.equal(phase3[15].estimated, false);
-  assert.equal(phase3[15].max_hp, 19388951 * 1.05);
-  const phase4 = buildSeasonScores('s2-phase4').records;
-  for (let index = 0; index < phase3.length; index++) {
-    assert.equal(phase4[index].round, phase3[index].round);
-    assert.equal(phase4[index].boss_position, phase3[index].boss_position);
-    assert.equal(phase4[index].max_hp, phase3[index].max_hp);
-    assert.equal(phase4[index].hp_status, 'provisional');
+test('both seasons preserve 45 supplied same-position HP rows and mark only R10-R15 as inferred', () => {
+  for (const id of ['s2-phase3', 's2-phase4']) {
+    const rows = buildSeasonScores(id).records;
+    for (let index = 0; index < rows.length; index++) {
+      const wave = rows[index], expected = expectedLatest(index);
+      assert.equal(wave.round, Math.floor(index / 5) + 1);
+      assert.equal(wave.boss_position, index % 5 + 1);
+      near(wave.max_hp, expected.hp);
+      assert.equal(wave.hp_status, index < 45 ? 'source' : 'inferred');
+    }
   }
-  assert.match(getSeason('s2-phase4').scoring.hpBasis, /暂按 S2-3 相同轮次、相同出场位次/);
+  assert.match(getSeason('s2-phase3').scoring.hpBasis, /类比/);
+  assert.match(getSeason('s2-phase4').scoring.hpBasis, /用户/);
 });
 
 test('matrix resistances use the confirmed 20% base and 40% tagged attribute, with uniform chest resistance', () => {
@@ -165,7 +207,7 @@ test('older season definitions may omit special properties without losing score 
     for (const season of [phase3, phase4]) for (const boss of season.bosses) delete boss.specialProperties;
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.equal(JSON.parse(result.stdout)[0].full_kill_points, source.records[0].full_kill_points);
+  near(JSON.parse(result.stdout)[0].full_kill_points, expectedLatest(0).total);
 });
 
 function runChangedConfig(change) {
@@ -194,7 +236,7 @@ test('editing JSON points changes scores and prefixes without relying on obsolet
   });
   assert.equal(result.status, 0, result.stderr);
   const rows = JSON.parse(result.stdout);
-  assert.equal(rows[0].full_kill_points, source.records[0].full_kill_points + 123.5);
+  near(rows[0].full_kill_points, expectedLatest(0).total + 123.5);
   assert.equal(rows[0].cumulative_points_before, 0);
   assert.equal(rows[1].cumulative_points_before, rows[0].full_kill_points);
 });

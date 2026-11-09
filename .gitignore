@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+dist/
+build/
+outputs/
+data/raw/
+runtime/
+.publish/
+.env
+.env.*
+*.log

@@ -18,6 +18,7 @@ async function removeCurrent() { await page.locator('#delete-plan').click(); awa
 try {
   await mkdir('outputs', { recursive: true });
   await page.goto(baseUrl); await page.locator('.team-bar').first().waitFor();
+  assert.match(await page.locator('#coverage-note').innerText(), /类比/);
   const content16 = JSON.parse(await readFile('data/matrix_content_16.json', 'utf8'));
   assert.equal(await page.locator('.matrix-circuit').count(), 4);
   assert.equal(await page.locator('.matrix-character-enhancement').count(), 13);
@@ -50,7 +51,8 @@ try {
   await page.locator('#matrix-details').screenshot({ path: 'outputs/matrix-s2-3-buffs.png' });
   await page.locator('#new-plan').click(); await page.locator('#plan-name').fill('S2-4筹备');
   await page.locator('#plan-season').selectOption('s2-phase4');
-  assert.match(await page.locator('#plan-season-note').innerText(), /暂/);
+  assert.match(await page.locator('#plan-season-note').innerText(), /用户/);
+  assert.doesNotMatch(await page.locator('#plan-season-note').innerText(), /暂按S2-3|暂按 S2-3/);
   await page.locator('#confirm-plan').click();
   const phase4Id = await page.locator('#plan-select').inputValue();
   assert.match(await page.locator('.stage-label').innerText(), /S2-4/);
@@ -60,8 +62,9 @@ try {
   assert.equal(await page.locator('#stamina-season').inputValue(), 's2-phase4');
   assert.ok(await page.locator('#fit-bloodline').isEnabled()); assert.ok(await page.locator('#max-round').isEnabled());
   assert.equal(await page.locator('.boss-segment').count(), 10);
-  assert.equal(await page.locator('.provisional-boss').count(), 10);
-  assert.deepEqual(await page.locator('.boss-name').evaluateAll(nodes => nodes.slice(0, 5).map(node => node.firstChild.textContent)), ['R1 飞廉之猩（暂定）', 'R1 达妮娅（暂定）', 'R1 无冠者（暂定）', 'R1 辛吉勒姆（暂定）', 'R1 矩阵奇藏（暂定）']);
+  assert.equal(await page.locator('.provisional-boss').count(), 0);
+  assert.deepEqual(await page.locator('.boss-name').evaluateAll(nodes => nodes.slice(0, 5).map(node => node.firstChild.textContent)), ['R1 飞廉之猩', 'R1 达妮娅', 'R1 无冠者', 'R1 辛吉勒姆', 'R1 矩阵奇藏']);
+  assert.match(await page.locator('#coverage-note').innerText(), /用户提供/);
   const content18 = JSON.parse(await readFile('data/matrix_content_18.json', 'utf8'));
   assert.deepEqual(await page.locator('.matrix-circuit p').allTextContents(), content18.circuits.map(item => item.description));
   assert.equal(await page.locator('#matrix-details-source').getAttribute('href'), 'https://ww.nanoka.cc/newtower/18');
@@ -77,9 +80,11 @@ try {
   for (const name of ['洛瑟菈', '安可', '莫特斐']) await page.getByRole('button', { name, exact: true }).click();
   await page.locator('#confirm-characters').click(); await page.locator('.pending-team').first().dblclick();
   await page.locator('#dialog-team-score').fill('10000'); await page.locator('#confirm-characters').click();
-  assert.equal(await page.locator('.team-bar').count(), 1); assert.match(await page.locator('#start-location').innerText(), /飞廉之猩.*分数暂定/);
+  assert.equal(await page.locator('.team-bar').count(), 1); assert.match(await page.locator('#start-location').innerText(), /飞廉之猩.*剩余/);
+  assert.doesNotMatch(await page.locator('#start-location').innerText(), /暂定/);
   await page.locator('#target-score').fill('20000'); await page.locator('#locate-score').click();
-  assert.match(await page.locator('#target-score-location').innerText(), /暂定.*剩余分数/);
+  assert.match(await page.locator('#target-score-location').innerText(), /剩余分数/);
+  assert.doesNotMatch(await page.locator('#target-score-location').innerText(), /暂定/);
   const phase4Config = await exportConfig();
   assert.equal(phase4Config.matrixSeason, 's2-phase4'); assert.equal(phase4Config.towerId, 18);
   assert.equal(phase4Config.staminaSeason, 's2-phase4'); assert.match(phase4Config.matrixVersion, /S2第四阶段/);
@@ -125,5 +130,5 @@ try {
   await page.locator('#delete-plan').click(); const bounds = await page.locator('#confirm-delete-plan').boundingBox();
   assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 844);
   assert.deepEqual(errors, []);
-  console.log('PASS: R10 fit stays R10; JSON-driven S2-3/S2-4 content; S2-4 exact Boss order and provisional same-position scores; proper period JSON/new-plan choice; delete cancel/backup/permanent/reload/last-plan/failure safety; no deleted-sample respawn; mobile layout.');
+  console.log('PASS: R10 fit stays R10; JSON-driven S2-3/S2-4 content; same-position integer scores for both seasons and correct Boss order; proper period JSON/new-plan choice; delete cancel/backup/permanent/reload/last-plan/failure safety; no deleted-sample respawn; mobile layout.');
 } finally { await browser.close(); }

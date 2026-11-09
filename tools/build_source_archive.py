@@ -33,6 +33,12 @@ REQUIRED_FILES = {
     'tools/boss_details_smoke.mjs', 'tools/matrix_plans_smoke.mjs',
     'tools/boss_properties_smoke.mjs', 'tools/pending_delete_smoke.mjs',
     'tools/picker_overview_smoke.mjs',
+    'config/character_order.json', 'data/character_search.json', 'data/s2_4_score_source.json',
+    'assets/characters/Rover_Combined_v1.png', 'tools/update_s2_4_scores.py',
+    'tools/features_1_2_smoke.mjs', 'tools/picker_animation_smoke.mjs',
+    'tools/drag_preview_smoke.mjs', 'tools/pinyin_search_smoke.mjs',
+    'tools/rover_merge_smoke.mjs', 'tools/picker_order_sidebar_smoke.mjs',
+    'tools/score_table_migration_smoke.mjs', 'tests/test_s2_4_scoring.py',
     'tests/season-config.test.mjs',
 }
 BROWSER_FILE_LIMIT = 25 * 1024 * 1024

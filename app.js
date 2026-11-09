@@ -9,18 +9,39 @@ const STORAGE = 'wuwa-matrix-demo-v1';
 const LIBRARY_STORAGE = 'wuwa-matrix-plan-library-v1';
 const nf = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 });
 const fmt = value => nf.format(value);
+const gapNumberFormat = new Intl.NumberFormat('zh-CN', { maximumSignificantDigits: 15 });
 const element = (tag, className, text) => {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
 };
-const [characterData, example, elementData, alternateExample] = await Promise.all(['data/characters.json', 'config/demo.json', 'data/elements.json', 'config/alternate-demo.json'].map(async url => {
+const [characterData, example, elementData, alternateExample, characterSearchData, characterOrder] = await Promise.all(['data/characters.json', 'config/demo.json', 'data/elements.json', 'config/alternate-demo.json', 'data/character_search.json', 'config/character_order.json'].map(async url => {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`无法加载 ${url}`);
   return response.json();
 }));
-const characters = characterData.entries.filter(entry => !entry.download_failed);
+const characters = characterData.entries.filter(entry => !entry.download_failed).map(entry =>
+  characterIdentity(entry) === '漂泊者' ? { ...entry, icon_file: 'assets/characters/Rover_Combined_v1.png' } : entry);
+// Keep every original ID valid for saved plans; only the picker merges same-element forms.
+const pickerChoiceGroups = new Map();
+for (const entry of characters) {
+  const key = characterIdentity(entry) === '漂泊者' ? `rover-${entry.element}` : entry.id;
+  if (!pickerChoiceGroups.has(key)) pickerChoiceGroups.set(key, { ...entry, memberIds: [] });
+  pickerChoiceGroups.get(key).memberIds.push(entry.id);
+}
+const pickerCharacters = [...pickerChoiceGroups.values()];
+const orderedNames = [...characterOrder.front, ...characterOrder.groups.flat()];
+const pickerNameRank = new Map(orderedNames.map((name, index) => [name, index]));
+const quickPickerCharacters = pickerCharacters.map((entry, index) => ({ entry, rank: characterIdentity(entry) === '漂泊者' ? 2000 + characterOrder.roverElements.indexOf(entry.element) : pickerNameRank.get(entry.name) ?? 1000 + index }))
+  .sort((a, b) => a.rank - b.rank).map(item => item.entry);
+function normalizeCharacterSearch(text) {
+  return String(text).replace(/ü/gi, 'v').normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[\s·:：'’_-]+/g, '');
+}
+const characterSearchKeys = new Map(characters.map(character => {
+  const syllables = (characterSearchData.pinyin[character.name] || '').split(/\s+/).filter(Boolean);
+  return [character.id, [character.name, character.name_en || '', character.id, syllables.join(''), syllables.map(part => part[0]).join('')].map(normalizeCharacterSearch).filter(Boolean)];
+}));
 const characterMap = new Map(characters.map(entry => [entry.id, entry]));
 const characterIds = new Set(characterMap.keys());
 const identityById = new Map(characters.map(entry => [entry.id, characterIdentity(entry)]));
@@ -30,6 +51,18 @@ let scores = scoreTables.get(example.matrixSeason);
 let bossMap = new Map();
 function validatePlan(value, options = {}) {
   return validateConfig(value, characterIds, scoreTables.get(matrixInfo(value).id).records, identityById, staminaRules, options);
+}
+function restorePlan(value) {
+  const restored = structuredClone(value);
+  const records = scoreTables.get(matrixInfo(restored).id).records;
+  const markerRemoved = Number.isFinite(restored.scoreMarker) && restored.scoreMarker > records.at(-1).cumulative_points_after;
+  if (markerRemoved) restored.scoreMarker = null;
+  if (Array.isArray(restored.teams) && Number.isInteger(restored.maxRound) && restored.maxRound >= 1) {
+    const required = restored.teams.reduce((sum, team) => sum + team.score, 0);
+    const sufficient = records.find(wave => wave.cumulative_points_after >= required);
+    if (sufficient) restored.maxRound = Math.max(restored.maxRound, sufficient.round);
+  }
+  return { config: validatePlan(restored, { allowStaminaConflicts: true }), markerRemoved };
 }
 function syncSeasonRuntime() {
   const season = getSeason(state);
@@ -48,10 +81,6 @@ try {
     try { localStorage.setItem(`${STORAGE}-restore-backup`, saved); } catch { /* The in-memory backup remains downloadable. */ }
     if (!localStorage.getItem(`${STORAGE}-before-connected-v2`)) localStorage.setItem(`${STORAGE}-before-connected-v2`, saved);
     const previous = JSON.parse(saved);
-    const previousScores = scoreTables.get(matrixInfo(previous).id);
-    if (matrixInfo(previous).scoreReady && previous.scoreMarker != null && previous.scoreMarker > previousScores.records.at(-1).cumulative_points_after) {
-      previous.scoreMarker = null; removedOutOfRangeMarker = true;
-    }
     for (const team of previous.teams || []) {
       const roster = [];
       const own = new Set();
@@ -63,10 +92,8 @@ try {
       team.characterIds = roster;
       if (roster.length < 3) team.needsCharacters = true;
     }
-    const required = previous.teams.reduce((sum, team) => sum + team.score, 0);
-    const sufficient = previousScores.records.find(wave => wave.cumulative_points_after >= required);
-    if (sufficient && sufficient.round > previous.maxRound) previous.maxRound = sufficient.round;
-    state = validatePlan(previous, { allowStaminaConflicts: true });
+    const restored = restorePlan(previous);
+    state = restored.config; removedOutOfRangeMarker = restored.markerRemoved;
   }
 } catch (error) { restoreError = error.message; }
 state.teams = packTeams(state.teams);
@@ -79,10 +106,15 @@ try {
   if (savedLibrary) {
     try { localStorage.setItem(`${LIBRARY_STORAGE}-restore-backup`, savedLibrary); } catch { }
     try {
-      planLibrary = normalizePlanLibrary(JSON.parse(savedLibrary), value => validatePlan(value, { allowStaminaConflicts: true }));
+      let libraryMarkerRemoved = false;
+      planLibrary = normalizePlanLibrary(JSON.parse(savedLibrary), value => {
+        const restored = restorePlan(value);
+        libraryMarkerRemoved ||= restored.markerRemoved;
+        return restored.config;
+      });
       existingLibraryLoaded = true;
       state = structuredClone(planLibrary.plans.find(plan => plan.id === planLibrary.activePlanId).config);
-      restoreError = null; repairedRosters = false; removedOutOfRangeMarker = false;
+      restoreError = null; repairedRosters = false; removedOutOfRangeMarker = libraryMarkerRemoved;
     } catch (error) {
       libraryRecoveryLocked = true;
       try {
@@ -404,8 +436,13 @@ function openBossDetails(wave) {
   $('boss-total-hp-label').textContent = `总血量${wave.hp_status === 'provisional' ? '（暂定）' : wave.hp_status === 'inferred' ? '（推算）' : ''}`;
   $('boss-total-hp').textContent = wave.max_hp == null ? '待确认' : fmt(wave.max_hp);
   const notes = [];
-  if (['inferred', 'provisional'].includes(wave.hp_status) || wave.max_hp == null) notes.push(season.scoring.hpBasis || '本轮总血量尚未实测。');
+  if (['inferred', 'provisional'].includes(wave.hp_status) || wave.max_hp == null || wave.source_label === '同位次类比') notes.push(season.scoring.hpBasis || '本轮总血量尚未实测。');
   if (wave.provisional) notes.push(season.scoring.basis);
+  if (wave.points_per_damage != null) {
+    const coefficient = wave.points_per_damage.toLocaleString('zh-CN', { maximumFractionDigits: 12 });
+    notes.push(`计分：每 1 伤害 = ${coefficient} 分${wave.kill_bonus ? `，击杀额外 ${fmt(wave.kill_bonus)} 分` : ''}。`);
+  }
+  if (wave.score_rounding === 'floor-per-boss') notes.push('整只 Boss 的分数向下取整后，再累计相加。');
   $('boss-data-basis').textContent = notes.join(' ');
   $('boss-data-basis').hidden = notes.length === 0;
   $('boss-resistances').replaceChildren();
@@ -570,10 +607,87 @@ function renderList() {
     team.characterIds.forEach(id => images.append(portrait(id)));
     main.append(images);
     button.append(main, element('span', 'team-card-score', team.needsScore ? '待填分数' : `${fmt(team.score)} 分`));
-    button.addEventListener('click', () => { selectedId = team.id; renderList(); renderEditor(); renderPositions(); });
+    button.addEventListener('pointerdown', event => startSidebarDrag(event, team, button));
+    button.addEventListener('click', () => { if (Date.now() < suppressSidebarClickUntil) return; selectedId = team.id; renderList(); renderEditor(); renderPositions(); });
     $('team-list').append(button);
   }
   if (!state.teams.length) $('team-list').append(element('div', 'empty-list', '新建一支队伍开始排布'));
+}
+
+let suppressSidebarClickUntil = 0;
+function startSidebarDrag(event, team, card) {
+  if (event.button !== 0) return;
+  const list = $('team-list');
+  const nodes = [...list.querySelectorAll('.team-card')];
+  const bounds = list.getBoundingClientRect();
+  const entries = nodes.map(node => ({ id: node.dataset.id, node, top: node.getBoundingClientRect().top - bounds.top + list.scrollTop, height: node.getBoundingClientRect().height }));
+  const original = entries.find(item => item.id === team.id);
+  const gap = parseFloat(getComputedStyle(list).gap) || 0;
+  const initialY = event.clientY, initialScroll = list.scrollTop;
+  let target = state.teams.findIndex(item => item.id === team.id), moved = false, finished = false;
+  card.setPointerCapture(event.pointerId);
+  const move = pointer => {
+    if (!moved && Math.abs(pointer.clientY - initialY) < 5) return;
+    if (!moved) {
+      moved = true; dragging = true; selectedId = team.id; hideTeamTooltip();
+      renderEditor(); renderPositions();
+      list.classList.add('sidebar-drag-preview'); card.classList.add('sidebar-is-dragging');
+    }
+    const visible = list.getBoundingClientRect();
+    if (pointer.clientY < visible.top + 24) list.scrollTop -= 14;
+    if (pointer.clientY > visible.bottom - 24) list.scrollTop += 14;
+    const desired = original.top + pointer.clientY - initialY + list.scrollTop - initialScroll;
+    const others = entries.filter(item => item.id !== team.id);
+    const slots = [entries[0].top];
+    for (const item of others) slots.push(slots.at(-1) + item.height + gap);
+    target = slots.reduce((best, value, index) => Math.abs(value - desired) < Math.abs(slots[best] - desired) ? index : best, 0);
+    const order = [...others]; order.splice(target, 0, original);
+    let top = entries[0].top;
+    for (const item of order) { item.node.style.transform = `translateY(${top - item.top}px)`; top += item.height + gap; }
+    const display = axisTeams().map(item => ({ ...item, score: item.axisScore }));
+    const preview = reorderTeams(display, team.id, target);
+    const lane = document.querySelector('.team-lane'); lane.classList.add('drag-preview-active');
+    for (const item of preview) {
+      const bar = [...lane.querySelectorAll('.team-bar')].find(node => node.dataset.id === item.id);
+      bar.style.left = `${LABEL + item.startScore * state.pixelsPerPoint}px`;
+      bar.classList.toggle('is-reordering', item.id === team.id);
+    }
+    const selected = preview.find(item => item.id === team.id);
+    for (const guide of document.querySelectorAll('.axis-guide')) {
+      guide.classList.add('drag-preview-guide');
+      guide.style.left = `${LABEL + (selected.startScore + (guide.classList.contains('end') ? selected.score : 0)) * state.pixelsPerPoint}px`;
+    }
+    $('coverage-note').textContent = `松开后排为第 ${target + 1} 队 · 按 Esc 取消`;
+  };
+  const finish = pointer => {
+    if (finished) return;
+    finished = true; dragging = false;
+    card.removeEventListener('pointermove', move); card.removeEventListener('pointerup', finish); card.removeEventListener('pointercancel', cancel); card.removeEventListener('lostpointercapture', cancel);
+    document.removeEventListener('keydown', escape, true); window.removeEventListener('resize', cancel);
+    if (card.hasPointerCapture(event.pointerId)) card.releasePointerCapture(event.pointerId);
+    if (!moved) return;
+    suppressSidebarClickUntil = Date.now() + 250;
+    const beforeList = new Map(nodes.map(node => [node.dataset.id, node.getBoundingClientRect().top]));
+    const beforeAxis = new Map([...document.querySelectorAll('.team-bar')].map(node => [node.dataset.id, node.getBoundingClientRect().left]));
+    const scroll = list.scrollTop;
+    list.classList.remove('sidebar-drag-preview');
+    if (pointer.type !== 'pointercancel') { state.teams = reorderTeams(state.teams, team.id, target); persist(); }
+    renderAll(); list.scrollTop = scroll;
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      for (const node of list.querySelectorAll('.team-card')) {
+        const delta = beforeList.get(node.dataset.id) - node.getBoundingClientRect().top;
+        if (Math.abs(delta) > .5) node.animate([{ transform: `translateY(${delta}px)` }, { transform: 'translateY(0)' }], { duration: 180, easing: 'ease-out' });
+      }
+      for (const node of document.querySelectorAll('.team-bar')) {
+        const delta = beforeAxis.get(node.dataset.id) - node.getBoundingClientRect().left;
+        if (Math.abs(delta) > .5) node.animate([{ transform: `translateX(${delta}px)` }, { transform: 'translateX(0)' }], { duration: 180, easing: 'ease-out' });
+      }
+    }
+  };
+  const cancel = () => finish({ type: 'pointercancel' });
+  const escape = key => { if (key.key === 'Escape') { key.preventDefault(); key.stopImmediatePropagation(); cancel(); } };
+  card.addEventListener('pointermove', move); card.addEventListener('pointerup', finish); card.addEventListener('pointercancel', cancel); card.addEventListener('lostpointercapture', cancel);
+  document.addEventListener('keydown', escape, true); window.addEventListener('resize', cancel);
 }
 
 function renderEditor() {
@@ -618,11 +732,32 @@ function renderAxisLocation(node, score, preview) {
   if (preview) node.prepend(element('span', 'axis-preview-tag', '预览 · '));
 }
 
+function renderTargetScoreGap() {
+  const input = $('target-score'), output = $('target-score-gap');
+  const text = input.value.trim(), target = Number(text);
+  output.replaceChildren();
+  output.hidden = input.validity.badInput || !text || !Number.isFinite(target) || target < 0;
+  if (output.hidden) { delete output.dataset.status; return; }
+  const actual = state.teams.reduce((sum, team) => sum + (team.needsScore ? 0 : team.score), 0);
+  const pending = state.teams.filter(team => team.needsScore).length;
+  const difference = target - actual;
+  const tolerance = Number.EPSILON * Math.max(1, Math.abs(target), Math.abs(actual)) * Math.max(1, state.teams.length);
+  if (Math.abs(difference) <= tolerance) {
+    output.dataset.status = 'reached';
+    output.textContent = '已达到目标分数';
+  } else {
+    output.dataset.status = difference > 0 ? 'shortfall' : 'exceeded';
+    output.append(document.createTextNode(difference > 0 ? '距离目标分数还差 ' : '已超出目标分数 '), element('strong', '', gapNumberFormat.format(Math.abs(difference))), document.createTextNode(' 分'));
+  }
+  if (pending) output.append(element('small', 'gap-pending-note', `${pending} 队待填分数，未计入`));
+}
+
 function renderScoreMarker() {
   $('score-marker')?.remove();
   const value = state.scoreMarker;
   $('clear-score-marker').disabled = value == null;
   $('target-score').value = value ?? '';
+  renderTargetScoreGap();
   if (value == null) { $('target-score-location').textContent = '输入目标总分，定位到对应 Boss 并标记。'; return; }
   if (hasBloodline()) renderLocation($('target-score-location'), locateScore(value, waves()));
   else $('target-score-location').textContent = `${matrixInfo(state).name} · 累计 ${fmt(value)} 分，Boss 血线待配置`;
@@ -755,6 +890,24 @@ function startDrag(event, team, bar) {
   const initialIndex = state.teams.findIndex(item => item.id === team.id);
   let targetIndex = initialIndex;
   let moved = false;
+  let finished = false;
+  const lane = bar.closest('.team-lane');
+  function previewOrder(index) {
+    const proposed = reorderTeams(displayTeams, team.id, index);
+    lane.classList.add('drag-preview-active');
+    bar.classList.add('is-reordering');
+    for (const item of proposed) {
+      const node = [...lane.querySelectorAll('.team-bar')].find(node => node.dataset.id === item.id);
+      node.style.left = `${LABEL + item.startScore * state.pixelsPerPoint}px`;
+      node.dataset.dragPreviewIndex = proposed.indexOf(item);
+    }
+    const moving = proposed.find(item => item.id === team.id);
+    for (const guide of document.querySelectorAll('.axis-guide')) {
+      guide.classList.add('drag-preview-guide');
+      guide.style.left = `${LABEL + (moving.startScore + (guide.classList.contains('end') ? moving.score : 0)) * state.pixelsPerPoint}px`;
+    }
+    return moving;
+  }
   const viewport = $('timeline-viewport');
   const initialScroll = viewport.scrollLeft;
   bar.focus({ preventScroll: true });
@@ -767,26 +920,41 @@ function startDrag(event, team, bar) {
     if (moveEvent.clientX < bounds.left + LABEL + 20) viewport.scrollLeft -= 16;
     const deltaX = moveEvent.clientX - initialX + viewport.scrollLeft - initialScroll;
     targetIndex = nearestTeamSlot(displayTeams, team.id, initialStart + deltaX / state.pixelsPerPoint);
-    const proposed = reorderTeams(displayTeams, team.id, targetIndex).find(item => item.id === team.id);
+    const proposed = previewOrder(targetIndex);
     $('team-drop-marker').hidden = false;
     $('team-drop-marker').style.left = `${LABEL + proposed.startScore * state.pixelsPerPoint}px`;
     $('team-drop-marker').textContent = `第 ${targetIndex + 1} 队`;
     $('coverage-note').textContent = `松开后排为第 ${targetIndex + 1} 队 · 首尾自动吸附`;
   };
   const finish = finishEvent => {
+    if (finished) return;
+    finished = true;
     dragging = false;
     bar.removeEventListener('pointermove', move);
     bar.removeEventListener('pointerup', finish);
     bar.removeEventListener('pointercancel', finish);
-    if (finishEvent.type === 'pointercancel') { renderTimeline(); return; }
+    bar.removeEventListener('lostpointercapture', cancel);
+    document.removeEventListener('keydown', escapeDrag, true);
+    if (bar.hasPointerCapture(event.pointerId)) bar.releasePointerCapture(event.pointerId);
     if (!moved) return;
+    const before = new Map([...lane.querySelectorAll('.team-bar')].map(node => [node.dataset.id, node.getBoundingClientRect().left]));
     suppressDoubleClickUntil = Date.now() + 300;
-    state.teams = reorderTeams(state.teams, team.id, targetIndex);
-    persist(); renderAll();
+    if (finishEvent.type !== 'pointercancel') { state.teams = reorderTeams(state.teams, team.id, targetIndex); persist(); }
+    renderAll();
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      for (const node of document.querySelectorAll('.team-bar')) {
+        const delta = before.get(node.dataset.id) - node.getBoundingClientRect().left;
+        if (Number.isFinite(delta) && Math.abs(delta) > .5) node.animate([{ transform: `translateX(${delta}px)` }, { transform: 'translateX(0)' }], { duration: 180, easing: 'ease-out' });
+      }
+    }
   };
+  const cancel = () => finish({ type: 'pointercancel' });
+  const escapeDrag = keyEvent => { if (keyEvent.key === 'Escape') { keyEvent.preventDefault(); keyEvent.stopImmediatePropagation(); cancel(); } };
   bar.addEventListener('pointermove', move);
   bar.addEventListener('pointerup', finish);
   bar.addEventListener('pointercancel', finish);
+  bar.addEventListener('lostpointercapture', cancel);
+  document.addEventListener('keydown', escapeDrag, true);
 }
 
 function renderTimeline() {
@@ -888,7 +1056,7 @@ function renderTimeline() {
     segment.dataset.estimated = Boolean(wave.estimated);
     segment.dataset.provisional = Boolean(wave.provisional);
     const reference = getSeason(wave.score_reference_season);
-    segment.title = `R${wave.round} ${wave.name}${wave.provisional ? `（暂按${reference.season}-${reference.stage}相同出场位次计分）` : wave.estimated ? '（按原表规律推算）' : '（原表）'}：伤害积分 ${fmt(wave.damage_points_at_full_hp)}${wave.kill_bonus ? '，击杀额外 1000 分' : ''}`;
+    segment.title = `R${wave.round} ${wave.name}${wave.provisional ? `（暂按${reference.season}-${reference.stage}相同出场位次计分）` : wave.estimated ? `（按${wave.source_label === '原表' ? '原表' : '最新表'}规律推算）` : `（${wave.source_label}）`}：伤害积分 ${fmt(wave.damage_points_at_full_hp)}${wave.kill_bonus ? '，击杀额外 1000 分' : ''}`;
     const art = element('img', 'boss-art'); art.src = bossMap.get(wave.name).icon_file; art.alt = ''; art.loading = 'lazy';
     const name = element('div', 'boss-name', `R${wave.round} ${wave.name}${wave.provisional ? '（暂定）' : wave.estimated ? '（推算）' : ''}`);
     name.append(element('span', '', `${fmt(wave.damage_points_at_full_hp)} 分`));
@@ -914,8 +1082,10 @@ function renderTimeline() {
   if (!hasBloodline()) bossRow.append(element('p', 'bloodline-unavailable', `${matrixInfo(state).name} 的 Boss 血量分数表待配置。`));
   sheet.append(bossRow, element('div', 'axis-guide start'), element('div', 'axis-guide end'));
   const projected = waves().filter(wave => wave.estimated).length;
-  const reference = getSeason(getSeason(state).scoring.basedOnSeason);
-  $('coverage-note').textContent = hasBloodline() ? matrixInfo(state).provisional ? `R1—R${state.maxRound} · ${waves().length} 条暂定分数（按${reference.season}-${reference.stage}同位次）` : `R1—R${state.maxRound} · ${waves().length - projected} 条原表${projected ? `＋${projected} 条推算` : ''}` : `${matrixInfo(state).name} · 仅队伍分数轴`;
+  const season = getSeason(state);
+  const reference = getSeason(season.scoring.basedOnSeason);
+  const sourceLabel = season.scoring.sourceLabel ? `${season.scoring.sourceLabel}数据` : '原表';
+  $('coverage-note').textContent = hasBloodline() ? matrixInfo(state).provisional ? `R1—R${state.maxRound} · ${waves().length} 条暂定分数（按${reference.season}-${reference.stage}同位次）` : `R1—R${state.maxRound} · ${waves().length - projected} 条${sourceLabel}${projected ? `＋${projected} 条推算` : ''}` : `${matrixInfo(state).name} · 仅队伍分数轴`;
   renderPositions();
   renderScoreMarker();
   renderRulerTicks();
@@ -1021,7 +1191,70 @@ function openTeamOverview() {
   $('team-overview-dialog').showModal();
 }
 
+const pickerFlights = new Set();
+function clearPickerFlights() {
+  for (const flight of pickerFlights) { flight.animation.cancel(); flight.image.remove(); }
+  pickerFlights.clear();
+  document.querySelectorAll('.picker-awaiting-arrival').forEach(node => node.classList.remove('picker-awaiting-arrival'));
+}
+
+function pickerFlightFrames(from, to) {
+  const dx = to.left - from.left, dy = to.top - from.top;
+  const sx = to.width / from.width, sy = to.height / from.height;
+  return [
+    { transform: 'translate(0,0) scale(1)', opacity: .95 },
+    { transform: `translate(${dx * .48}px,${dy * .48 - 32}px) scale(${(1 + sx) / 2},${(1 + sy) / 2})`, opacity: 1, offset: .5 },
+    { transform: `translate(${dx}px,${dy}px) scale(${sx},${sy})`, opacity: 1 },
+  ];
+}
+
+function syncPickerFlights() {
+  for (const flight of pickerFlights) {
+    const target = flight.target();
+    if (!target) continue;
+    target.classList.add('picker-awaiting-arrival');
+    flight.animation.effect.setKeyframes(pickerFlightFrames(flight.from, target.getBoundingClientRect()));
+  }
+}
+
+function animatePickedCharacter(id, from, target) {
+  if (!from || !target || !$('character-dialog').open || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const to = target.getBoundingClientRect();
+  if (!from.width || !to.width) return;
+  const image = portrait(id, 'picker-flying-portrait');
+  image.alt = ''; image.setAttribute('aria-hidden', 'true');
+  Object.assign(image.style, { left: `${from.left}px`, top: `${from.top}px`, width: `${from.width}px`, height: `${from.height}px` });
+  $('character-dialog').append(image);
+  const slot = target.dataset.pickerSlot;
+  const resolveTarget = slot !== undefined
+    ? () => $('quick-team-preview').querySelector(`[data-picker-slot="${slot}"]`)
+    : () => $('picker-selected-roster').querySelector(`[data-character-id="${id}"]`);
+  target.classList.add('picker-awaiting-arrival');
+  const animation = image.animate(pickerFlightFrames(from, to), { duration: 430, easing: 'cubic-bezier(.22,.65,.3,1)', fill: 'forwards' });
+  const flight = { image, animation, from, target: resolveTarget }; pickerFlights.add(flight);
+  animation.finished.then(() => {
+    if (!pickerFlights.has(flight)) return;
+    const destination = resolveTarget();
+    destination?.classList.remove('picker-awaiting-arrival');
+    if (destination) destination.animate([{ boxShadow: '0 0 0 4px #e6bd79aa' }, { boxShadow: '0 0 0 0 #e6bd7900' }], { duration: 220 });
+  }).catch(() => {}).finally(() => {
+    image.remove();
+    if (pickerFlights.has(flight)) { resolveTarget()?.classList.remove('picker-awaiting-arrival'); pickerFlights.delete(flight); }
+  });
+}
+
+function renderPickedRoster() {
+  $('picker-selected-roster').replaceChildren();
+  for (const id of picked) {
+    const image = portrait(id); image.dataset.characterId = id;
+    $('picker-selected-roster').append(image);
+  }
+  syncPickerFlights();
+}
+
 function configurePickerMode(quick) {
+  clearPickerFlights();
+  $('picker-selected-roster').hidden = quick;
   $('character-dialog').classList.toggle('quick-mode', quick);
   document.querySelector('.dialog-team-fields').hidden = quick;
   $('quick-team-panel').hidden = !quick;
@@ -1035,12 +1268,12 @@ function updateQuickSequence(sequence) {
   $('character-feedback').textContent = '';
   renderCharacters();
   $('quick-team-preview').lastElementChild?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  syncPickerFlights();
 }
 
 function renderQuickPreview() {
   const sequence = quickSequence();
   const groups = splitQuickTeams(sequence);
-  $('quick-team-hint').textContent = `已有 ${state.teams.length} 队，从第 ${state.teams.length + 1} 队开始；每 3 人组成一队`;
   $('quick-undo').disabled = quickSession.cursor === 0;
   $('quick-redo').disabled = quickSession.cursor === quickSession.history.length - 1;
   $('quick-reset').disabled = sequence.length === 0;
@@ -1053,7 +1286,9 @@ function renderQuickPreview() {
     for (let slot = 0; slot < 3; slot++) {
       const member = element('div', 'quick-preview-member');
       member.append(element('small', '', `${index * 3 + slot + 1}`));
-      member.append(group[slot] ? portrait(group[slot]) : element('span', 'quick-empty-slot', '＋'));
+      const slotPortrait = group[slot] ? portrait(group[slot]) : element('span', 'quick-empty-slot', '＋');
+      if (group[slot]) slotPortrait.dataset.pickerSlot = index * 3 + slot;
+      member.append(slotPortrait);
       member.append(element('span', 'quick-preview-character-name', group[slot] ? characterMap.get(group[slot]).name : '待选择'));
       roster.append(member);
     }
@@ -1065,6 +1300,7 @@ function renderQuickPreview() {
   $('confirm-characters').textContent = `加入 ${Math.floor(sequence.length / 3)} 支队伍`;
   $('confirm-characters').disabled = sequence.length === 0 || sequence.length % 3 !== 0;
   if (sequence.length % 3) $('character-feedback').textContent = `当前队伍还差 ${3 - sequence.length % 3} 位角色。`;
+  syncPickerFlights();
 }
 
 function openQuickTeams() {
@@ -1118,7 +1354,7 @@ function renderElementFilters() {
 
 function renderCharacters() {
   if (!quickSession && dialogAutoName) $('dialog-team-name').value = defaultTeamName(picked, characterMap);
-  const search = $('character-search').value.trim().toLowerCase();
+  const search = normalizeCharacterSearch($('character-search').value);
   $('character-grid').replaceChildren();
   const team = quickSession ? null : pendingTeam || current();
   const sequence = quickSession ? quickSequence() : [];
@@ -1140,9 +1376,12 @@ function renderCharacters() {
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', active);
   }
-  const matches = characters.filter(item => (activeElement === 0 || item.element === activeElement) && (item.name.toLowerCase().includes(search) || item.name_en?.toLowerCase().includes(search) || item.id.includes(search)));
+  const candidates = quickSession && activeElement === 0 ? quickPickerCharacters : pickerCharacters;
+  const matches = candidates.filter(item => (activeElement === 0 || item.element === activeElement) && item.memberIds.some(id => characterSearchKeys.get(id).some(key => key.includes(search))));
   $('character-result-count').textContent = `${matches.length} 位角色`;
-  for (const entry of matches) {
+  for (const choice of matches) {
+    const selectedMember = currentPicked.find(id => choice.memberIds.includes(id));
+    const entry = characterMap.get(selectedMember || choice.id);
     const selected = currentPicked.includes(entry.id);
     const button = element('button', `character-choice${selected ? ' selected' : ''}`);
     button.setAttribute('aria-label', entry.name);
@@ -1163,20 +1402,26 @@ function renderCharacters() {
     if (limit > 1) avatar.append(element('small', `stamina-badge${season.bonusCharacterIds.includes(entry.id) ? ' temporary' : ''}`, `${limit}体`));
     button.append(avatar, element('span', 'character-choice-name', entry.name));
     button.addEventListener('click', () => {
+      const from = image.getBoundingClientRect();
       if (quickSession) {
         if (sequence.length >= (40 - state.teams.length) * 3) { $('character-feedback').textContent = '已达到 40 支队伍上限。'; return; }
-        updateQuickSequence([...sequence, entry.id]); return;
+        updateQuickSequence([...sequence, entry.id]);
+        animatePickedCharacter(entry.id, from, $('quick-team-preview').querySelectorAll('.quick-preview-member img')[sequence.length]);
+        return;
       }
-      if (picked.includes(entry.id)) picked = picked.filter(id => id !== entry.id);
+      const removing = picked.includes(entry.id);
+      if (removing) { clearPickerFlights(); picked = picked.filter(id => id !== entry.id); }
       else if (picked.length < 3) picked.push(entry.id);
       else { $('character-feedback').textContent = '每队最多 3 位角色，请先取消一位已选角色。'; return; }
       $('character-feedback').textContent = '';
       renderCharacters();
+      if (!removing) animatePickedCharacter(entry.id, from, $('picker-selected-roster').querySelector(`[data-character-id="${entry.id}"]`));
     });
     $('character-grid').append(button);
   }
   if (!matches.length) $('character-grid').append(element('p', 'empty-character-results', '没有匹配的角色，试试其他属性或清空搜索。'));
   if (quickSession) { renderQuickPreview(); return; }
+  renderPickedRoster();
   $('picked-count').textContent = `${picked.length} / 3`;
   $('picked-names').textContent = picked.map(id => characterMap.get(id).name).join(' · ');
   $('confirm-characters').disabled = picked.length !== 3;
@@ -1247,13 +1492,13 @@ $('confirm-characters').addEventListener('click', () => {
   state.teams = packTeams(state.teams);
   persist(); renderAll(); $('character-dialog').close();
 });
-$('character-dialog').addEventListener('close', () => { pendingTeam = null; quickSession = null; document.body.append($('toast')); $('toast').classList.remove('visible'); });
+$('character-dialog').addEventListener('close', () => { clearPickerFlights(); pendingTeam = null; quickSession = null; document.body.append($('toast')); $('toast').classList.remove('visible'); });
 $('quick-team').addEventListener('click', openQuickTeams);
 $('team-overview').addEventListener('click', openTeamOverview);
 $('close-team-overview').addEventListener('click', () => $('team-overview-dialog').close());
-$('quick-undo').addEventListener('click', () => { if (quickSession?.cursor > 0) { quickSession.cursor--; $('character-feedback').textContent = ''; renderCharacters(); } });
-$('quick-redo').addEventListener('click', () => { if (quickSession && quickSession.cursor < quickSession.history.length - 1) { quickSession.cursor++; $('character-feedback').textContent = ''; renderCharacters(); } });
-$('quick-reset').addEventListener('click', () => { if (quickSession && quickSequence().length) updateQuickSequence([]); });
+$('quick-undo').addEventListener('click', () => { clearPickerFlights(); if (quickSession?.cursor > 0) { quickSession.cursor--; $('character-feedback').textContent = ''; renderCharacters(); } });
+$('quick-redo').addEventListener('click', () => { clearPickerFlights(); if (quickSession && quickSession.cursor < quickSession.history.length - 1) { quickSession.cursor++; $('character-feedback').textContent = ''; renderCharacters(); } });
+$('quick-reset').addEventListener('click', () => { clearPickerFlights(); if (quickSession && quickSequence().length) updateQuickSequence([]); });
 document.addEventListener('keydown', event => {
   if (!quickSession || !$('character-dialog').open || !(event.ctrlKey || event.metaKey) || event.target.matches('input,textarea,[contenteditable=true]')) return;
   const key = event.key.toLowerCase();
@@ -1274,7 +1519,7 @@ function queueRulerTicks() {
   requestAnimationFrame(() => { rulerFrame = false; renderRulerTicks(); });
 }
 $('timeline-viewport').addEventListener('scroll', () => { hideTeamTooltip(); queueRulerTicks(); });
-window.addEventListener('resize', () => { document.querySelector('.inspector').style.minHeight = ''; hideTeamTooltip(); queueRulerTicks(); });
+window.addEventListener('resize', () => { clearPickerFlights(); document.querySelector('.inspector').style.minHeight = ''; hideTeamTooltip(); queueRulerTicks(); });
 function renderRoundOptions() {
   $('max-round').replaceChildren();
   for (let round = 1; round <= getSeason(state).maxRound; round++) {
@@ -1331,6 +1576,7 @@ $('score-locator').addEventListener('submit', event => {
   state.scoreMarker = value; if (hasBloodline()) state.maxRound = Math.max(state.maxRound, required.round);
   persist(); renderAll(); scrollToScore(value);
 });
+$('target-score').addEventListener('input', renderTargetScoreGap);
 $('clear-score-marker').addEventListener('click', () => { state.scoreMarker = null; persist(); renderScoreMarker(); });
 $('load-example').addEventListener('click', () => { teamDeletionHistories.delete(planLibrary.activePlanId); state = structuredClone(example); pendingStaminaSeason = null; if (!libraryRecoveryLocked) restoreError = null; renderRestoreWarning(); selectedId = state.teams[0].id; persist(); renderAll(); $('timeline-viewport').scrollLeft = 0; toast('已恢复示例排布'); });
 $('export-button').addEventListener('click', () => {
@@ -1413,4 +1659,4 @@ renderAll();
 renderRestoreWarning();
 if (!restoreError) persist();
 if (repairedRosters && !restoreError) toast('已保留队伍与分数，无法识别或同队重复的角色已标为待补选；原始配置备份已保留。');
-else if (removedOutOfRangeMarker) toast('已移除超出 R15 的旧目标标记，队伍与分数已保留。');
+else if (removedOutOfRangeMarker && !restoreError) toast('已移除超出 R15 的旧目标标记，队伍与分数已保留。');

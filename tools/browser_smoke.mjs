@@ -282,7 +282,7 @@ try {
   assert.equal(await readFile('outputs/restore-backup-test.json', 'utf8'), invalidSavedRaw);
   await loadPlan(base); assert.ok(await page.locator('#restore-warning').isHidden());
   await page.locator('#load-example').click();
-  assert.match(await page.locator('#start-location').innerText(), /剩余分数 4,677.1 分/);
+  assert.match(await page.locator('#start-location').innerText(), /剩余分数 4,680 分/);
   assert.ok(!(await page.locator('#start-location').innerText()).includes('血量'));
   await page.locator('#zoom-out').click();
   assert.ok((await exported()).pixelsPerPoint < .03);
@@ -298,7 +298,7 @@ try {
   assert.ok(sheetWidth <= view.width + 1);
   assert.ok((await exported()).pixelsPerPoint < fitted.pixelsPerPoint);
   await page.screenshot({ path: 'outputs/demo-full-bloodline.png' });
-  assert.equal(await page.locator('.projected-boss').count(), 33);
+  assert.equal(await page.locator('.projected-boss').count(), 30);
   assert.equal(await page.locator('#max-round').inputValue(), '15');
   assert.equal(await page.locator('#max-round option').count(), 15);
   await page.locator('#max-round').selectOption('10');
@@ -360,7 +360,8 @@ try {
   const beforeQuick = await exported();
   await page.locator('#quick-team').click();
   assert.ok(await page.locator('.dialog-team-fields').isHidden());
-  assert.match(await page.locator('#quick-team-hint').innerText(), /已有 3 队.*第 4 队/);
+  assert.equal(await page.locator('#quick-team-hint').count(), 0);
+  assert.equal(await page.locator('#quick-team-overview-list .team-overview-card').count(), 3);
   assert.match(await page.locator('#picked-count').innerText(), /0 人/);
   await page.getByRole('button', { name: '守岸人', exact: true }).click();
   assert.ok(await page.getByRole('button', { name: '守岸人', exact: true }).isDisabled());

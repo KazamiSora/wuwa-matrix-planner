@@ -5,6 +5,11 @@ import json
 import sys
 from pathlib import Path
 
+try:
+    from .update_s2_4_scores import build_scoring as build_s2_4_scoring, read_source as read_s2_4_source
+except ImportError:
+    from update_s2_4_scores import build_scoring as build_s2_4_scoring, read_source as read_s2_4_source
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -33,21 +38,7 @@ def make_season(tower_id, reference, stamina):
             character = {'id': actor['id'], 'name': actor['name'], 'icon_file': actor['icon_file'], 'enhancements': []}
             enhanced_characters.append(character)
         character['enhancements'].append({'sourceKey': 'season-stamina', 'kind': 'stamina-bonus', 'description': f"角色拥有额外{stamina_data['extraStamina']}点体力（{version_name}限定）。"})
-    provisional = phase == 4
-    waves = []
-    for wave in reference['records']:
-        waves.append({
-            'round': wave['round'],
-            'position': wave['boss_position'],
-            'fullPoints': wave['full_kill_points'],
-            'killBonus': wave['kill_bonus'],
-            'inferred': bool(wave.get('estimated')),
-            'sourceCell': None if provisional else wave.get('source_cell'),
-            'formula': wave.get('source_formula') or wave.get('projection_formula'),
-            'maxHp': wave['base_hp_literal'] * wave['post_r3_formula_multiplier'],
-            'hpStatus': 'provisional' if provisional else ('source' if wave['round'] <= 3 else 'inferred'),
-        })
-    return {
+    season = {
         'schemaVersion': 1,
         'id': season_id,
         'name': f'终焉矩阵S2-{phase}（S2第{"三" if phase == 3 else "四"}阶段）',
@@ -69,18 +60,9 @@ def make_season(tower_id, reference, stamina):
         },
         'circuits': copy.deepcopy(content['circuits']),
         'characters': enhanced_characters,
-        'scoring': {
-            'status': 'provisional' if provisional else 'source-and-inferred',
-            'basis': (
-                'S2-4分数暂按S2-3相同出场位次沿用，尚未实测；高轮次按原表规律推算。'
-                if provisional else
-                '42条原表分数保持原值；R9后三只及R10—R15共33条按原表R4起连续波次线性增长规律推算。'
-            ),
-            'basedOnSeason': 's2-phase3',
-            'hpBasis': 'S2-4 血量暂按 S2-3 相同轮次、相同出场位次沿用；其中 R4 起的血量按原表规律推算，尚未实测。' if provisional else 'R1—R3 血量依据原表；R4 起按血量基数×递增系数推算，尚未实测。',
-            'waves': waves,
-        },
+        'scoring': build_s2_4_scoring(read_s2_4_source(), 15, season_id=season_id),
     }
+    return season
 
 
 def write_new_file(path, data, force):

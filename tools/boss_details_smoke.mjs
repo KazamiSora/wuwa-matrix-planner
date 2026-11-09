@@ -8,7 +8,8 @@ const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google
 const page = await browser.newPage({ viewport: { width: 1440, height: 1050 } });
 const baseUrl = process.env.MATRIX_URL || 'http://127.0.0.1:4173';
 const errors = []; page.on('pageerror', error => errors.push(error.message));
-const source = JSON.parse(await readFile('data/scores.json', 'utf8')).records;
+const source = JSON.parse(await readFile('config/seasons/s2-3.json', 'utf8')).scoring.waves.map(wave => ({ damage_points_at_full_hp: wave.fullPoints - wave.killBonus, full_kill_points: wave.fullPoints, kill_bonus: wave.killBonus }));
+const tableWave = (hp, coefficient, bonus = 0) => ({ damage_points_at_full_hp: Math.floor(hp * coefficient), full_kill_points: Math.floor(hp * coefficient) + bonus, kill_bonus: bonus });
 const number = async id => Number((await page.locator(`#${id}`).innerText()).replace(/[^\d.-]/g, ''));
 const close = async () => { await page.keyboard.press('Escape'); assert.equal(await page.locator('#boss-dialog').isVisible(), false); };
 async function checkPoints(wave, percent) {
@@ -23,6 +24,7 @@ try {
   await page.locator('.boss-segment').first().click();
   assert.equal(await page.locator('#boss-dialog-title').innerText(), 'R1 燎照之骑');
   assert.equal(await number('boss-total-hp'), 5612519);
+  assert.equal(await number('boss-total-points'), 4680);
   assert.equal(await page.locator('#boss-resistances img').count(), 6);
   assert.deepEqual(await page.locator('#boss-resistances strong').allTextContents(), ['20%', '40%', '20%', '20%', '20%', '20%']);
   assert.equal(await page.locator('#boss-resistance-note').isVisible(), false);
@@ -41,6 +43,7 @@ try {
   await page.keyboard.press('Enter'); assert.equal(await page.locator('#boss-dialog').isVisible(), true); await close();
   await page.locator('.boss-segment').nth(4).click();
   assert.equal(await page.locator('#boss-dialog-title').innerText(), 'R1 矩阵奇藏');
+  assert.equal(await number('boss-total-points'), 6667);
   assert.deepEqual(await page.locator('#boss-resistances strong').allTextContents(), Array(6).fill('20%'));
   assert.match(await page.locator('#boss-calculation-note').innerText(), /0%.*1,000.*击杀奖励/);
   for (const percent of [100, 50, .001, 0]) await checkPoints(source[4], percent);
@@ -50,7 +53,7 @@ try {
   await close(); await page.setViewportSize({ width: 1440, height: 1050 });
   await page.locator('#max-round').selectOption('4');
   await page.locator('.boss-segment').nth(15).click();
-  assert.match(await page.locator('#boss-total-hp-label').innerText(), /推算/);
+  assert.equal(await page.locator('#boss-total-hp-label').innerText(), '总血量');
   assert.equal(await page.locator('#boss-total-points-label').innerText(), '总分数');
   assert.ok(Math.abs(await number('boss-total-hp') - 19388951 * 1.05) < .051); await close();
   await page.locator('#new-plan').click(); await page.locator('#plan-name').fill('Boss详情S2-4');
@@ -59,19 +62,40 @@ try {
   assert.equal(await page.locator('#boss-dialog-title').innerText(), 'R1 飞廉之猩');
   assert.deepEqual(await page.locator('#boss-resistances strong').allTextContents(), ['20%', '20%', '20%', '40%', '20%', '20%']);
   assert.equal(await number('boss-total-hp'), 5612519);
-  assert.equal(await page.locator('#boss-total-hp-label').innerText(), '总血量（暂定）');
-  assert.match(await page.locator('#boss-data-basis').innerText(), /血量暂按 S2-3 相同轮次、相同出场位次/);
-  assert.match(await page.locator('#boss-total-points-label').innerText(), /暂定/);
-  await checkPoints(source[0], 50);
+  assert.equal(await page.locator('#boss-total-hp-label').innerText(), '总血量');
+  assert.equal(await page.locator('#boss-total-points-label').innerText(), '总分数');
+  assert.doesNotMatch(await page.locator('#boss-dialog').innerText(), /暂定|暂按/);
+  await checkPoints(tableWave(5612519, .000834), 50);
   await page.locator('#boss-dialog').screenshot({ path: 'outputs/boss-details-s2-4.png' });
   await page.locator('#close-boss-dialog').click(); assert.equal(await page.locator('#boss-dialog').isVisible(), false);
   for (const [index, name, expected] of [[1, '达妮娅', ['20%', '40%', '20%', '20%', '20%', '20%']], [3, '辛吉勒姆', ['20%', '20%', '20%', '20%', '40%', '20%']]]) {
     await page.locator('.boss-segment').nth(index).click();
     assert.equal(await page.locator('#boss-dialog-title').innerText(), `R1 ${name}`);
-    assert.equal(await page.locator('#boss-total-hp-label').innerText(), '总血量（暂定）');
+    assert.equal(await page.locator('#boss-total-hp-label').innerText(), '总血量');
     assert.deepEqual(await page.locator('#boss-resistances strong').allTextContents(), expected);
     await close();
   }
+  await page.locator('.boss-segment').nth(4).click();
+  assert.equal(await page.locator('#boss-dialog-title').innerText(), 'R1 矩阵奇藏');
+  assert.equal(await number('boss-total-points'), 6667);
+  for (const percent of [100, 50, .001, 0]) await checkPoints(tableWave(6173771, .000918, 1000), percent);
+  assert.match(await page.locator('#boss-calculation-note').innerText(), /0%.*1,000.*击杀奖励/);
+  await close();
+  await page.locator('#max-round').selectOption('9');
+  await page.locator('.boss-segment').nth(44).click();
+  assert.equal(await page.locator('#boss-dialog-title').innerText(), 'R9 矩阵奇藏');
+  assert.equal(await page.locator('#boss-total-hp-label').innerText(), '总血量');
+  assert.equal(await page.locator('#boss-total-points-label').innerText(), '总分数');
+  assert.ok(Math.abs(await number('boss-total-hp') - 48472377.5) < .051);
+  for (const percent of [50, 0]) await checkPoints(tableWave(48472377.5, .001147, 1000), percent);
+  await close();
+  await page.locator('#max-round').selectOption('10');
+  await page.locator('.boss-segment').nth(45).click();
+  assert.equal(await page.locator('#boss-dialog-title').innerText(), 'R10 飞廉之猩');
+  assert.equal(await page.locator('#boss-total-hp-label').innerText(), '总血量（推算）');
+  assert.equal(await page.locator('#boss-total-points-label').innerText(), '总分数（推算）');
+  assert.ok(Math.abs(await number('boss-total-hp') - 49441825.05) < .051);
+  await checkPoints(tableWave(49441825.05, .001043), 50); await close();
   assert.deepEqual(errors, []);
-  console.log('PASS: Boss click/keyboard/close, all element icons, HP provenance, percent validation, fractional scores, chest kill-bonus boundary, S2-4 and mobile.');
+  console.log('PASS: Boss click/keyboard/close, icons, integer latest-table scores in both seasons, provided R9 vs inferred R10 HP, percent validation and chest kill-bonus boundary, mobile.');
 } finally { await browser.close(); }

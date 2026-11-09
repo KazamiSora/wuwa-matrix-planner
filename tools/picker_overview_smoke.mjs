@@ -25,7 +25,11 @@ async function checkOverview(container, teams) {
     const team = teams[index], card = cards.nth(index);
     assert.ok((await card.innerText()).includes(team.name));
     assert.deepEqual(await card.locator('img').evaluateAll(images => images.map(image => image.alt)), team.characterIds.map(id => characters.get(id).name));
-    for (const id of team.characterIds) assert.ok((await card.innerText()).includes(characters.get(id).name));
+    if (container === '#quick-team-overview-list') {
+      assert.ok(await card.locator('.team-overview-member > span:not(.quick-empty-slot)').evaluateAll(nodes => nodes.every(node => getComputedStyle(node).display === 'none')));
+    } else {
+      for (const id of team.characterIds) assert.ok((await card.innerText()).includes(characters.get(id).name));
+    }
     if (team.needsScore) assert.match(await card.innerText(), /待填/);
     else assert.ok((await card.innerText()).replaceAll(',', '').includes(String(team.score)));
   }
