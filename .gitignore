@@ -9,3 +9,15 @@ runtime/
 .env
 .env.*
 *.log
+
+# PR #1: local browser and development files.
+/user-data/
+/cache/
+/.cache/
+/temp/
+/.venv/
+/venv/
+node_modules/
+*.py[cod]
+/.codex/
+/.agents/

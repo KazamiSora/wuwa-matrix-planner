@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>终焉矩阵血线排布 V0.2.3</title>
+  <title>终焉矩阵血线排布 V0.3</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="app-header">
-    <a class="brand" href="./"><span class="brand-symbol">M</span><span>终焉矩阵<span class="brand-sub">血线排布 / V0.2.3</span></span></a>
+    <a class="brand" href="./"><span class="brand-symbol">M</span><span>终焉矩阵<span class="brand-sub">血线排布 / V0.3</span></span></a>
     <div class="header-actions"><span class="stage-label">终焉矩阵S2-3（S2第三阶段） · 奇点扩张</span><button id="import-button" class="quiet">导入 JSON</button><button id="export-button">导出 JSON <span aria-hidden="true">↗</span></button><input id="import-file" type="file" accept=".json,application/json" hidden></div>
   </header>
   <main>
@@ -23,11 +23,13 @@
       <div id="team-list" class="team-list"></div>
       <button id="add-team" class="add-team">＋ 新建队伍</button>
       <button id="quick-team" class="quick-team-button">快捷组队 · 连续选人</button>
+      <button id="manage-disabled-characters" type="button" class="disabled-characters-button">自主禁用角色</button>
+      <p id="disabled-removal-notice" class="disabled-removal-notice" role="status" hidden></p>
       <div class="editor-heading"><h3>队伍设置</h3><div class="team-delete-actions"><button id="undo-team-delete" type="button" class="text-button" aria-label="撤回队伍删除" disabled>撤回</button><button id="redo-team-delete" type="button" class="text-button" aria-label="恢复队伍删除" disabled>恢复</button><button id="delete-team" type="button" class="text-button">删除</button></div></div>
       <form id="team-form" class="team-form">
         <label>队伍名称<input id="team-name" maxlength="30" autocomplete="off" required></label>
         <div><span class="field-label">上阵角色 <span class="muted">点击更换</span></span><div id="selected-characters" class="selected-characters"></div></div>
-        <label>本队分数<div class="input-unit"><input id="team-score" type="number" min="0.01" step="any" required><span>分</span></div></label>
+        <label>本队分数<div class="input-unit"><input id="team-score" type="text" placeholder="如 5k、1.2w、1e4" autocomplete="off" spellcheck="false" maxlength="100" required><span>分</span></div></label>
         <label>起点累计积分 <span class="muted" id="team-start-mode">自动衔接</span><div class="input-unit"><input id="team-start" type="number" readonly aria-readonly="true"><span>分</span></div></label>
         <button type="submit" class="primary" id="apply-team">应用到血线轴</button>
       </form>
@@ -46,7 +48,7 @@
       <div class="timeline-card">
         <div class="timeline-toolbar"><div class="legend"><span class="legend-line"></span>分数条与 Boss 血线共用积分刻度</div><div class="view-controls"><label for="max-round">显示至</label><select id="max-round"></select><span class="control-divider"></span><button id="zoom-out" title="缩小" aria-label="缩小">−</button><input id="zoom" aria-label="时间轴缩放" type="range" min="0.000001" max="0.24" step="0.000001"><span id="zoom-level" class="zoom-level">100%</span><button id="zoom-in" title="放大" aria-label="放大">＋</button><button id="fit-teams" class="quiet">全部队伍</button><button id="fit-bloodline" class="quiet">全部血线</button><button id="jump-selected" class="quiet">定位选中队伍</button></div></div>
         <form id="score-locator" class="score-locator">
-          <label for="target-score">目标总分</label><div class="input-unit"><input id="target-score" aria-label="目标总分" type="number" min="0" step="any" placeholder="填写目标总分" required><span>分</span></div>
+          <label for="target-score">目标总分</label><div class="input-unit"><input id="target-score" aria-label="目标总分" type="text" title="支持1k/1w/1.1m等缩写，以及科学计数法1e2" autocomplete="off" spellcheck="false" maxlength="100" required><span>分</span></div>
           <button type="submit" id="locate-score">定位并标记</button><button type="button" id="clear-score-marker" class="quiet">清除标记</button>
           <span id="target-score-location" role="status" class="muted"></span>
           <span id="target-score-gap" role="status" aria-live="polite" hidden></span>
@@ -65,6 +67,8 @@
         </details>
         <details id="boss-properties-details" class="matrix-content-collapse">
           <summary>Boss 特殊性质<span id="boss-properties-count"></span></summary>
+          <div id="boss-season-filters" class="boss-filter-row" role="group" aria-label="按赛季筛选"></div>
+          <div id="boss-keyword-filters" class="boss-filter-row" role="group" aria-label="按性质关键词筛选"></div>
           <div class="boss-property-search"><input id="boss-properties-search" type="search" placeholder="搜索 Boss 名称、简称或性质…" aria-label="搜索 Boss 特殊性质"><span id="boss-properties-results" class="muted" role="status"></span></div>
           <div id="boss-properties-list" class="boss-properties-list"></div>
         </details>
@@ -105,7 +109,7 @@
       <div class="picker-main">
         <div class="dialog-team-fields">
       <label>队伍名称<input id="dialog-team-name" maxlength="30" autocomplete="off" placeholder="按角色首字生成，可手动修改"></label>
-      <label>本队分数<div class="input-unit"><input id="dialog-team-score" type="number" min="0.01" step="any" placeholder="填写本队分数"><span>分</span></div></label>
+      <label>本队分数<div class="input-unit"><input id="dialog-team-score" type="text" placeholder="如 5k、1.2w、1e4" autocomplete="off" spellcheck="false" maxlength="100"><span>分</span></div></label>
         </div>
         <div class="picker-meta-row">
           <p id="picker-stamina-note" class="picker-stamina-note"></p>
@@ -120,6 +124,15 @@
       </div>
     </div>
     <div class="dialog-footer"><div class="picker-selection-summary"><div id="picker-selected-roster" aria-label="本队已选角色"></div><span id="picked-names" class="muted"></span><span id="quick-shortcut-hint" class="muted"><span><kbd>Ctrl+Z</kbd> 撤回</span><span><kbd>Ctrl+Y</kbd> / <kbd>Ctrl+Shift+Z</kbd> 恢复</span></span></div><button id="confirm-characters" class="primary">确认选择</button></div>
+  </dialog>
+  <dialog id="disabled-characters-dialog" aria-labelledby="disabled-characters-title">
+    <div class="dialog-header"><h2 id="disabled-characters-title">自主禁用角色</h2><button id="close-disabled-characters" type="button" class="quiet" aria-label="关闭角色禁用设置">✕</button></div>
+    <p class="disabled-characters-note muted">禁用设置仅对当前排布方案生效。保存后，只删除当前方案中包含禁用角色的队伍，其他方案不受影响。漂泊者、炽霞、普通秧秧和白芷不提供禁用选项。</p>
+    <input id="disabled-character-search" type="search" placeholder="搜索名称 / 拼音 / 首字母…" aria-label="搜索禁用设置中的角色">
+    <div id="disabled-character-grid" class="character-grid"></div>
+    <p id="disabled-character-feedback" role="status"></p>
+    <p id="disabled-removal-preview" role="status"></p>
+    <div class="dialog-footer"><span id="disabled-character-count" class="muted"></span><div><button id="enable-all-characters" type="button">恢复全部角色</button><button id="save-disabled-characters" type="button" class="primary">保存设置</button></div></div>
   </dialog>
   <dialog id="team-overview-dialog" class="team-overview-dialog" aria-labelledby="team-overview-title">
     <div class="dialog-header"><h2 id="team-overview-title">队伍一览</h2><button id="close-team-overview" type="button" class="quiet" aria-label="关闭队伍一览">✕</button></div>

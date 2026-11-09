@@ -124,7 +124,7 @@ test('each JSON controls its own stamina bonus and matrix enhancements', () => {
   const rules = seasonStaminaRules();
   assert.deepEqual(rules.seasons[0].bonusCharacterIds, ['1509']);
   assert.deepEqual(rules.seasons[1].bonusCharacterIds, ['1109']);
-  assert.equal(Object.keys(phase3.stamina.baseStamina).length, 6);
+  assert.equal(Object.keys(phase3.stamina.baseStamina).length, 7);
   assert.equal(phase3.stamina.baseStamina['1110'], 2);
   assert.deepEqual(phase3.stamina.baseStamina, phase4.stamina.baseStamina);
   assert.equal(phase3.circuits.length, 4); assert.equal(phase4.circuits.length, 4);

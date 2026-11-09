@@ -1,5 +1,6 @@
 import { visibleWaves, locateScore, packTeams, reorderTeams, nearestTeamSlot, characterIdentity, validateConfig, staminaLimits, staminaConflicts, defaultTeamName, splitQuickTeams, axisTickStep, matrixInfo, bossScoreAtRemainingHp, layoutTeamPreviews, PENDING_TEAM_SCORE, createTeamDeletionHistory, deleteTeamWithHistory, undoTeamDeletion, redoTeamDeletion, MIN_ZOOM, MAX_ZOOM } from './score-axis.js';
 import { normalizePlanLibrary, createPlanLibrary, addPlan, copyPlan, renamePlan, updatePlan, activatePlan, deletePlan } from './plan-library.js';
+import { parseScoreInput } from './score-axis.js';
 import { seasonDefinitions, getSeason, seasonStaminaRules, buildSeasonScores } from './season-config.js';
 
 const $ = id => document.getElementById(id);
@@ -31,6 +32,16 @@ for (const entry of characters) {
   pickerChoiceGroups.get(key).memberIds.push(entry.id);
 }
 const pickerCharacters = [...pickerChoiceGroups.values()];
+const DISABLED_CHARACTERS_STORAGE = 'wuwa-matrix-disabled-characters-v1';
+const pickerChoiceIdByMember = new Map(pickerCharacters.flatMap(choice => choice.memberIds.map(id => [id, choice.id])));
+const alwaysAvailableChoices = new Set(pickerCharacters.filter(choice => characterIdentity(choice) === '漂泊者' || ['炽霞', '秧秧', '白芷'].includes(choice.name)).map(choice => choice.id));
+const disableableCharacters = pickerCharacters.filter(choice => !alwaysAvailableChoices.has(choice.id));
+let disabledCharacters = new Set(), legacyDisabledCharacters = new Set(), disabledCharacterDraft = new Set(), disabledCharactersLoadError = '';
+try {
+  const stored = JSON.parse(localStorage.getItem(DISABLED_CHARACTERS_STORAGE) || '[]');
+  if (!Array.isArray(stored) || stored.some(id => typeof id !== 'string')) throw new Error('格式无效');
+  legacyDisabledCharacters = new Set(stored.map(id => pickerChoiceIdByMember.get(id)).filter(id => id && !alwaysAvailableChoices.has(id)));
+} catch { disabledCharactersLoadError = '原禁用设置未能读取，保存后将以本次选择为准。'; }
 const orderedNames = [...characterOrder.front, ...characterOrder.groups.flat()];
 const pickerNameRank = new Map(orderedNames.map((name, index) => [name, index]));
 const quickPickerCharacters = pickerCharacters.map((entry, index) => ({ entry, rank: characterIdentity(entry) === '漂泊者' ? 2000 + characterOrder.roverElements.indexOf(entry.element) : pickerNameRank.get(entry.name) ?? 1000 + index }))
@@ -66,6 +77,8 @@ function restorePlan(value) {
 }
 function syncSeasonRuntime() {
   const season = getSeason(state);
+  disabledCharacters = new Set((state.disabledCharacterIds || []).map(id => pickerChoiceIdByMember.get(id)).filter(id => id && !alwaysAvailableChoices.has(id)));
+  state.disabledCharacterIds = [...disabledCharacters];
   scores = scoreTables.get(season.id);
   bossMap = new Map(season.bosses.map(boss => [boss.name, boss]));
 }
@@ -129,6 +142,39 @@ if (!existingLibraryLoaded && !planLibrary.plans.some(plan => plan.id === 'plan-
   const previousActive = planLibrary.activePlanId;
   planLibrary = addPlan(planLibrary, '示例B · 椿丹白先手', validatePlan(alternateExample), 'plan-demo-b');
   planLibrary = activatePlan(planLibrary, previousActive);
+}
+let disabledIsolationNotice = '';
+if (!restoreError && !libraryRecoveryLocked && !planLibrary.plans.some(plan => Object.hasOwn(plan.config, 'disabledCharacterIds'))) {
+  try {
+    const priorRaw = localStorage.getItem(`${LIBRARY_STORAGE}-before-character-disable`);
+    let prior = null;
+    try { if (priorRaw) prior = normalizePlanLibrary(JSON.parse(priorRaw)); } catch { /* Keep an invalid backup untouched. */ }
+    const ownerId = prior && planLibrary.plans.some(plan => plan.id === prior.activePlanId) ? prior.activePlanId : planLibrary.activePlanId;
+    const next = structuredClone(planLibrary);
+    let recovered = 0;
+    for (const plan of next.plans) {
+      const original = prior?.plans.find(item => item.id === plan.id);
+      if (plan.id !== ownerId && original && legacyDisabledCharacters.size) {
+        const filtered = packTeams(original.config.teams.filter(team => !teamUsesDisabledCharacter(team, legacyDisabledCharacters)));
+        const oldSettings = { ...original.config, teams: [] }, currentSettings = { ...plan.config, teams: [] };
+        // Restore only an exact footprint of the old cross-plan deletion, never later user edits.
+        if (filtered.length < original.config.teams.length && JSON.stringify(filtered) === JSON.stringify(plan.config.teams) && JSON.stringify(oldSettings) === JSON.stringify(currentSettings)) {
+          try {
+            const restored = restorePlan(original.config).config;
+            recovered += restored.teams.length - plan.config.teams.length;
+            plan.config = restored;
+          } catch { /* Preserve the backup if it cannot be safely restored. */ }
+        }
+      }
+      plan.config.disabledCharacterIds = plan.id === ownerId ? [...legacyDisabledCharacters] : [];
+    }
+    if (legacyDisabledCharacters.size || recovered) {
+      if (!localStorage.getItem(`${LIBRARY_STORAGE}-before-disabled-isolation`)) localStorage.setItem(`${LIBRARY_STORAGE}-before-disabled-isolation`, JSON.stringify(planLibrary));
+      disabledIsolationNotice = recovered ? `禁用设置已按方案独立保存，已从备份恢复其他方案中误删的 ${recovered} 支队伍。` : '旧禁用设置已归入原操作方案，其他方案不再共用。';
+    }
+    planLibrary = next;
+    state = structuredClone(planLibrary.plans.find(plan => plan.id === planLibrary.activePlanId).config);
+  } catch { disabledCharactersLoadError = '旧禁用设置未能迁移，原数据和备份已保留。'; }
 }
 let planAction = null;
 let planStorageError = false;
@@ -211,6 +257,7 @@ function toast(message) {
 }
 
 function persist() {
+  state.disabledCharacterIds = [...new Set((state.disabledCharacterIds || []).map(id => pickerChoiceIdByMember.get(id)).filter(id => id && !alwaysAvailableChoices.has(id)))];
   normalizeTeamNames();
   planLibrary = updatePlan(planLibrary, planLibrary.activePlanId, state);
   if (libraryRecoveryLocked) { planStorageError = true; updateSaveStatus(); return; }
@@ -259,6 +306,7 @@ function enterActivePlan() {
   delete state.planName;
   selectedId = state.teams[0]?.id;
   pendingStaminaSeason = null; pendingTeam = null; quickSession = null;
+  $('disabled-removal-notice').hidden = true;
   if (!libraryRecoveryLocked) restoreError = null;
   renderRestoreWarning(); persist(); renderAll(); $('timeline-viewport').scrollLeft = 0;
 }
@@ -373,10 +421,35 @@ function renderBossPropertiesText(container, boss) {
   else for (const description of properties) container.append(element('p', '', description));
 }
 
+let bossSeasonFilter = 'all';
+const bossKeywordFilters = new Set();
+const bossPropertyKeywords = ['同奏', '效应', '声骸', '护盾', '谐度'];
+function renderBossPropertyFilters() {
+  $('boss-season-filters').replaceChildren(element('span', 'muted', '赛季'));
+  for (const [value, label] of [['all', '全部'], ...seasonDefinitions.map(season => [`${season.season}-${season.stage}`, `${season.season}-${season.stage}`])]) {
+    const button = element('button', 'boss-filter-button', label); button.type = 'button';
+    button.setAttribute('aria-pressed', String(bossSeasonFilter === value));
+    button.addEventListener('click', () => { bossSeasonFilter = value; renderBossPropertyFilters(); renderBossPropertiesCatalog(); });
+    $('boss-season-filters').append(button);
+  }
+  $('boss-keyword-filters').replaceChildren(element('span', 'muted', '关键词'));
+  for (const word of ['全部', ...bossPropertyKeywords]) {
+    const active = word === '全部' ? !bossKeywordFilters.size : bossKeywordFilters.has(word);
+    const button = element('button', 'boss-filter-button', word); button.type = 'button'; button.setAttribute('aria-pressed', String(active));
+    button.addEventListener('click', () => {
+      if (word === '全部') bossKeywordFilters.clear();
+      else if (bossKeywordFilters.has(word)) bossKeywordFilters.delete(word); else bossKeywordFilters.add(word);
+      renderBossPropertyFilters(); renderBossPropertiesCatalog();
+    });
+    $('boss-keyword-filters').append(button);
+  }
+  $('boss-keyword-filters').append(element('small', 'muted', '可多选，匹配任一关键词'));
+}
 function renderBossPropertiesCatalog() {
   const catalog = new Map();
   for (const season of seasonDefinitions) {
     for (const boss of season.bosses) {
+      if (!boss.specialProperties?.some(text => text.trim())) continue;
       const key = `${boss.id}:${JSON.stringify(boss.specialProperties || [])}`;
       if (!catalog.has(key)) catalog.set(key, { boss, seasons: [] });
       catalog.get(key).seasons.push(`${season.season}-${season.stage}`);
@@ -384,7 +457,9 @@ function renderBossPropertiesCatalog() {
   }
   const entries = [...catalog.values()];
   const query = $('boss-properties-search').value.trim().toLowerCase();
-  const matches = entries.filter(({ boss, seasons }) => [boss.name, boss.alias, ...seasons, ...(boss.specialProperties || [])].join(' ').toLowerCase().includes(query));
+  const matches = entries.filter(({ boss, seasons }) => (bossSeasonFilter === 'all' || seasons.includes(bossSeasonFilter)) &&
+    (!bossKeywordFilters.size || [...bossKeywordFilters].some(word => boss.specialProperties.some(text => text.includes(word)))) &&
+    [boss.name, boss.alias, ...seasons, ...boss.specialProperties].join(' ').toLowerCase().includes(query));
   $('boss-properties-count').textContent = `（${entries.length}）`;
   $('boss-properties-results').textContent = `${matches.length} / ${entries.length} 只 Boss`;
   $('boss-properties-list').replaceChildren();
@@ -734,10 +809,15 @@ function renderAxisLocation(node, score, preview) {
 
 function renderTargetScoreGap() {
   const input = $('target-score'), output = $('target-score-gap');
-  const text = input.value.trim(), target = Number(text);
+  const text = input.value.trim(), target = parseScoreInput(text);
   output.replaceChildren();
   output.hidden = input.validity.badInput || !text || !Number.isFinite(target) || target < 0;
   if (output.hidden) { delete output.dataset.status; return; }
+  if (target > 10_000_000_000) {
+    output.dataset.status = 'easter-egg';
+    output.textContent = '这个目标分数你确定？哪怕开隧者进矩阵都拿不到！';
+    return;
+  }
   const actual = state.teams.reduce((sum, team) => sum + (team.needsScore ? 0 : team.score), 0);
   const pending = state.teams.filter(team => team.needsScore).length;
   const difference = target - actual;
@@ -1252,6 +1332,75 @@ function renderPickedRoster() {
   syncPickerFlights();
 }
 
+function teamUsesDisabledCharacter(team, disabled) {
+  return team.characterIds.some(id => { const choiceId = pickerChoiceIdByMember.get(id); return !alwaysAvailableChoices.has(choiceId) && disabled.has(choiceId); });
+}
+
+function disabledCharacterImpact(disabled) {
+  const next = updatePlan(planLibrary, planLibrary.activePlanId, state);
+  const removed = [];
+  for (const plan of next.plans) {
+    if (plan.id !== next.activePlanId) continue;
+    plan.config.disabledCharacterIds = [...disabled];
+    const affected = plan.config.teams.filter(team => teamUsesDisabledCharacter(team, disabled));
+    if (!affected.length) continue;
+    removed.push({ planId: plan.id, planName: plan.name, teams: affected });
+    plan.config.teams = packTeams(plan.config.teams.filter(team => !teamUsesDisabledCharacter(team, disabled)));
+  }
+  return { library: next, removed, count: removed.reduce((sum, item) => sum + item.teams.length, 0) };
+}
+
+function saveDisabledCharacterSettings() {
+  if (libraryRecoveryLocked) { $('disabled-character-feedback').textContent = '请先完成原排布库的恢复处理，再保存禁用设置。'; return; }
+  disabledCharacterDraft = new Set([...disabledCharacterDraft].filter(id => !alwaysAvailableChoices.has(id)));
+  const changes = [];
+  try {
+    const impact = disabledCharacterImpact(disabledCharacterDraft);
+    const nextState = structuredClone(impact.library.plans.find(plan => plan.id === impact.library.activePlanId).config);
+    const updates = [];
+    if (impact.count) updates.push([`${LIBRARY_STORAGE}-before-character-disable`, JSON.stringify(updatePlan(planLibrary, planLibrary.activePlanId, state))]);
+    updates.push([LIBRARY_STORAGE, JSON.stringify(impact.library)], [STORAGE, JSON.stringify(nextState)]);
+    for (const [key, value] of updates) {
+      const previous = localStorage.getItem(key);
+      localStorage.setItem(key, value); changes.push([key, previous]);
+    }
+    disabledCharacters = new Set(disabledCharacterDraft); disabledCharactersLoadError = '';
+    planLibrary = impact.library; state = nextState; planStorageError = false;
+    if (!state.teams.some(team => team.id === selectedId)) selectedId = state.teams[0]?.id;
+    for (const [id, history] of teamDeletionHistories) {
+      if (id !== planLibrary.activePlanId) continue;
+      if (impact.removed.some(item => item.planId === id) || [...history.undo, ...history.redo].some(record => teamUsesDisabledCharacter(record.team, disabledCharacters))) teamDeletionHistories.delete(id);
+    }
+    const names = impact.removed.flatMap(item => item.teams.map(team => team.name));
+    const message = impact.count ? `已从当前方案删除 ${impact.count} 支含禁用角色的队伍：${names.slice(0, 3).join('、')}${names.length > 3 ? '等' : ''}。` : `当前方案已保存，${disabledCharacters.size} 位角色在选人时隐藏。`;
+    $('disabled-removal-notice').textContent = impact.count ? message : '';
+    $('disabled-removal-notice').hidden = !impact.count;
+    $('disabled-characters-dialog').close(); renderAll(); toast(message);
+  } catch {
+    let restored = true;
+    for (const [key, previous] of changes.reverse()) {
+      try { if (previous === null) localStorage.removeItem(key); else localStorage.setItem(key, previous); } catch { restored = false; }
+    }
+    $('disabled-character-feedback').textContent = restored ? '设置未能保存，队伍和禁用设置未更改，请重试。' : '设置未能完整保存，请保留当前页面并导出排布备份后重试。';
+  }
+}
+
+function renderDisabledCharacterSettings() {
+  const query = normalizeCharacterSearch($('disabled-character-search').value);
+  $('disabled-character-grid').replaceChildren();
+  for (const choice of quickPickerCharacters.filter(item => !alwaysAvailableChoices.has(item.id) && item.memberIds.some(id => characterSearchKeys.get(id).some(key => key.includes(query))))) {
+    const disabled = disabledCharacterDraft.has(choice.id);
+    const button = element('button', `availability-choice${disabled ? ' is-disabled' : ''}`); button.type = 'button';
+    button.setAttribute('aria-label', `禁用${choice.name}`); button.setAttribute('aria-pressed', String(disabled));
+    button.append(portrait(choice.id), element('span', '', choice.name), element('small', '', disabled ? '已禁用' : '可选'));
+    button.addEventListener('click', () => { if (disabledCharacterDraft.has(choice.id)) disabledCharacterDraft.delete(choice.id); else disabledCharacterDraft.add(choice.id); renderDisabledCharacterSettings(); });
+    $('disabled-character-grid').append(button);
+  }
+  $('disabled-character-count').textContent = `已禁用 ${disabledCharacterDraft.size} / ${disableableCharacters.length} 位角色`;
+  const impact = disabledCharacterImpact(disabledCharacterDraft);
+  $('disabled-removal-preview').textContent = impact.count ? `保存后将删除当前方案中的 ${impact.count} 支队伍，其他方案不受影响。` : '';
+}
+
 function configurePickerMode(quick) {
   clearPickerFlights();
   $('picker-selected-roster').hidden = quick;
@@ -1377,7 +1526,8 @@ function renderCharacters() {
     button.setAttribute('aria-pressed', active);
   }
   const candidates = quickSession && activeElement === 0 ? quickPickerCharacters : pickerCharacters;
-  const matches = candidates.filter(item => (activeElement === 0 || item.element === activeElement) && item.memberIds.some(id => characterSearchKeys.get(id).some(key => key.includes(search))));
+  const matches = candidates.filter(item => (!disabledCharacters.has(item.id) || (!quickSession && item.memberIds.some(id => currentPicked.includes(id)))) &&
+    (activeElement === 0 || item.element === activeElement) && item.memberIds.some(id => characterSearchKeys.get(id).some(key => key.includes(search))));
   $('character-result-count').textContent = `${matches.length} 位角色`;
   for (const choice of matches) {
     const selectedMember = currentPicked.find(id => choice.memberIds.includes(id));
@@ -1394,11 +1544,12 @@ function renderCharacters() {
     button.disabled = quickSession ? exhausted || selectedIdentities.has(identityById.get(entry.id)) : (!selected && exhausted) || sameFamily;
     button.classList.toggle('unavailable', button.disabled);
     button.title = `${entry.name}：可上阵 ${limit} 队，其他队伍已使用 ${owner.length} 次${owner.length ? `（${owner.join('、')}）` : ''}`;
+    if (disabledCharacters.has(choice.id)) button.title += '；已自主禁用，本队原有角色仍可取消选择';
     const image = portrait(entry.id, ''); image.loading = 'lazy';
     const avatar = element('div', 'character-avatar');
     avatar.append(image);
     const remaining = Math.max(0, limit - owner.length - (selected ? 1 : 0));
-    avatar.append(element('small', 'availability', sameFamily ? '同一角色已选' : `剩余 ${remaining}/${limit} 体`));
+    avatar.append(element('small', 'availability', disabledCharacters.has(choice.id) ? '本队已有·已禁用' : sameFamily ? '同一角色已选' : `剩余 ${remaining}/${limit} 体`));
     if (limit > 1) avatar.append(element('small', `stamina-badge${season.bonusCharacterIds.includes(entry.id) ? ' temporary' : ''}`, `${limit}体`));
     button.append(avatar, element('span', 'character-choice-name', entry.name));
     button.addEventListener('click', () => {
@@ -1419,7 +1570,7 @@ function renderCharacters() {
     });
     $('character-grid').append(button);
   }
-  if (!matches.length) $('character-grid').append(element('p', 'empty-character-results', '没有匹配的角色，试试其他属性或清空搜索。'));
+  if (!matches.length) $('character-grid').append(element('p', 'empty-character-results', disabledCharacters.size ? '没有匹配的可选角色，请检查搜索、属性或“自主禁用角色”设置。' : '没有匹配的角色，试试其他属性或清空搜索。'));
   if (quickSession) { renderQuickPreview(); return; }
   renderPickedRoster();
   $('picked-count').textContent = `${picked.length} / 3`;
@@ -1437,7 +1588,7 @@ function renderCharacters() {
 $('team-form').addEventListener('submit', event => {
   event.preventDefault();
   const team = current(); if (!team) return;
-  const score = Number($('team-score').value);
+  const score = parseScoreInput($('team-score').value);
   const name = $('team-name').value.trim();
   if (!name || !Number.isFinite(score) || score <= 0) { toast('请输入队名与正数得分'); return; }
   if (hasBloodline() && state.teams.reduce((sum, item) => sum + (item.id === team.id ? score : item.score), 0) > total() + 1e-7) { toast('队伍总分超出当前轴，请先增加显示轮次'); return; }
@@ -1475,9 +1626,9 @@ $('confirm-characters').addEventListener('click', () => {
   const name = $('dialog-team-name').value.trim() || defaultTeamName(picked, characterMap);
   const scoreText = $('dialog-team-score').value.trim();
   const awaitingScore = (Boolean(pendingTeam) || team.needsScore === true) && !scoreText;
-  const score = Number(scoreText);
+  const score = awaitingScore ? 0 : parseScoreInput(scoreText);
   if (!name || name.length > 30) { $('character-feedback').textContent = '请填写 1—30 个字符的队伍名称。'; $('dialog-team-name').focus(); return; }
-  if (!awaitingScore && (!scoreText || !Number.isFinite(score) || score <= 0)) { $('character-feedback').textContent = '请填写大于 0 的队伍分数。'; $('dialog-team-score').focus(); return; }
+  if ($('dialog-team-score').validity.badInput || (!awaitingScore && (!scoreText || !Number.isFinite(score) || score <= 0))) { $('character-feedback').textContent = '请填写大于 0 的队伍分数。'; $('dialog-team-score').focus(); return; }
   const required = state.teams.filter(other => other.id !== team.id).reduce((sum, other) => sum + other.score, score);
   const sufficient = scores.records.find(wave => wave.cumulative_points_after >= required);
   if (hasBloodline() && !sufficient) { $('character-feedback').textContent = '队伍总分超出已导入的血线数据范围，请调整分数。'; return; }
@@ -1494,6 +1645,16 @@ $('confirm-characters').addEventListener('click', () => {
 });
 $('character-dialog').addEventListener('close', () => { clearPickerFlights(); pendingTeam = null; quickSession = null; document.body.append($('toast')); $('toast').classList.remove('visible'); });
 $('quick-team').addEventListener('click', openQuickTeams);
+$('manage-disabled-characters').addEventListener('click', () => {
+  $('disabled-characters-title').textContent = `自主禁用角色 · ${activePlan().name}`;
+  disabledCharacterDraft = new Set(disabledCharacters); $('disabled-character-search').value = '';
+  $('disabled-character-feedback').textContent = disabledCharactersLoadError;
+  renderDisabledCharacterSettings(); $('disabled-characters-dialog').showModal();
+});
+$('disabled-character-search').addEventListener('input', renderDisabledCharacterSettings);
+$('close-disabled-characters').addEventListener('click', () => $('disabled-characters-dialog').close());
+$('enable-all-characters').addEventListener('click', () => { disabledCharacterDraft.clear(); renderDisabledCharacterSettings(); });
+$('save-disabled-characters').addEventListener('click', saveDisabledCharacterSettings);
 $('team-overview').addEventListener('click', openTeamOverview);
 $('close-team-overview').addEventListener('click', () => $('team-overview-dialog').close());
 $('quick-undo').addEventListener('click', () => { clearPickerFlights(); if (quickSession?.cursor > 0) { quickSession.cursor--; $('character-feedback').textContent = ''; renderCharacters(); } });
@@ -1569,7 +1730,7 @@ $('jump-selected').addEventListener('click', () => { const team = current(); if 
 $('score-locator').addEventListener('submit', event => {
   event.preventDefault();
   const text = $('target-score').value.trim();
-  const value = Number(text);
+  const value = parseScoreInput(text);
   if (!text || !Number.isFinite(value) || value < 0) { toast('请输入不小于 0 的目标总分'); return; }
   const required = scores.records.find(wave => wave.cumulative_points_after >= value);
   if (hasBloodline() && !required) { toast('目标总分超出已导入的 Boss 数据范围'); return; }
@@ -1654,9 +1815,11 @@ $('stamina-season').addEventListener('change', () => {
 $('zoom').min = MIN_ZOOM;
 $('zoom').max = MAX_ZOOM;
 renderElementFilters();
+renderBossPropertyFilters();
 renderBossPropertiesCatalog();
 renderAll();
 renderRestoreWarning();
 if (!restoreError) persist();
 if (repairedRosters && !restoreError) toast('已保留队伍与分数，无法识别或同队重复的角色已标为待补选；原始配置备份已保留。');
 else if (removedOutOfRangeMarker && !restoreError) toast('已移除超出 R15 的旧目标标记，队伍与分数已保留。');
+if (disabledIsolationNotice && !restoreError) { $('disabled-removal-notice').textContent = disabledIsolationNotice; $('disabled-removal-notice').hidden = false; toast(disabledIsolationNotice); }

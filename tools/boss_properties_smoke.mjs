@@ -36,21 +36,21 @@ try {
   assert.equal(await page.locator('#boss-properties-details + h3').innerText(), '角色强化');
   assert.equal(await page.locator('#boss-properties-list').isVisible(), false);
   await page.locator('#boss-properties-details > summary').click();
-  assert.deepEqual(await cardNames(), ['燎照之骑', '封庭械囿', '无冠者', '天傀劫煞', '矩阵奇藏', '飞廉之猩', '达妮娅', '辛吉勒姆']);
-  assert.equal(await page.locator('#boss-properties-list .boss-properties-copy p').filter({ hasText: /^暂无特殊性质说明。$/ }).count(), 2);
+  assert.deepEqual(await cardNames(), ['封庭械囿', '无冠者', '天傀劫煞', '飞廉之猩', '达妮娅', '辛吉勒姆']);
+  assert.equal(await page.locator('#boss-properties-list .boss-properties-copy p').filter({ hasText: /^暂无特殊性质说明。$/ }).count(), 0);
   assert.equal((await cardNames()).filter(name => name === '无冠者').length, 1);
-  await page.locator('#boss-properties-search').fill('摩托');
-  assert.deepEqual(await cardNames(), ['燎照之骑']);
+  await page.locator('#boss-properties-search').fill('盾山');
+  assert.deepEqual(await cardNames(), ['封庭械囿']);
   await page.locator('#boss-properties-search').fill('迷航');
   assert.deepEqual(await cardNames(), ['辛吉勒姆']);
-  assert.equal(await page.locator('#boss-properties-results').innerText(), '1 / 8 只 Boss');
+  assert.equal(await page.locator('#boss-properties-results').innerText(), '1 / 6 只 Boss');
   await page.locator('#boss-properties-search').fill('不存在的Boss');
   assert.equal(await page.locator('.boss-property-card').count(), 0);
   assert.match(await page.locator('.boss-property-empty').innerText(), /没有找到匹配/);
   await page.locator('#boss-properties-search').fill('S2-4');
-  assert.deepEqual(await cardNames(), ['无冠者', '矩阵奇藏', '飞廉之猩', '达妮娅', '辛吉勒姆']);
+  assert.deepEqual(await cardNames(), ['无冠者', '飞廉之猩', '达妮娅', '辛吉勒姆']);
   await page.locator('#boss-properties-search').fill('');
-  assert.equal(await page.locator('.boss-property-card').count(), 8);
+  assert.equal(await page.locator('.boss-property-card').count(), 6);
   await page.locator('#boss-properties-details').screenshot({ path: 'outputs/boss-properties-list.png' });
 
   for (const index of [1, 2, 3]) {
@@ -80,5 +80,5 @@ try {
   await page.locator('#boss-dialog').screenshot({ path: 'outputs/boss-properties-modal-mobile.png' });
   await page.keyboard.press('Escape'); assert.equal(await page.locator('#boss-dialog').isVisible(), false);
   assert.deepEqual(errors, []);
-  console.log('PASS: all eight Boss properties; collapsed placement; name/alias/effect/season search; empty and reset; exact corresponding modal text; HP/resistance/score unchanged; mobile list and scrollable long modal.');
+  console.log('PASS: six Bosses with special properties; collapsed placement; name/alias/effect/season search; empty and reset; exact corresponding modal text; HP/resistance/score unchanged; mobile list and scrollable long modal.');
 } finally { await browser.close(); }

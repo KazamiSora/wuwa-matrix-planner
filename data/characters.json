@@ -834,11 +834,15 @@
       "name_en": "Lily",
       "icon_source_path": "/Game/Aki/UI/UIResources/Common/Image/IconRoleHead256/T_IconRoleHead256_77_UI.T_IconRoleHead256_77_UI",
       "icon_url": "https://static.nanoka.cc/assets/ww/UIResources/Common/Image/IconRoleHead256/T_IconRoleHead256_77_UI.webp",
-      "icon_file": "assets/characters/T_IconRoleHead256_77_UI.webp",
+      "icon_file": "assets/characters/Lily_UserPortrait_v1.png",
       "rank": 5,
       "element": 5,
       "weapon": 3,
-      "download_failed": true
+      "sha256": "f57d20ac8043c966fe2b45250876ee2e299b7cbbd5cabec8c011eeb78eeb7054",
+      "bytes": 2472101,
+      "width": 1254,
+      "height": 1254,
+      "source_note": "用户提供的莉莉角色图，经图像编辑抠出头像"
     },
     {
       "id": "1601",

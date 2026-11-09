@@ -289,8 +289,8 @@ test('JSON prevents cross-team reuse, including other Rover variants', () => {
   const legacy = structuredClone(example); legacy.teams[0].startScore = 2000;
   assert.equal(validateConfig(legacy, characters, scores).teams[0].startScore, 0);
 });
-test('all six configured two-stamina characters may enter two teams, but not three', () => {
-  assert.equal(Object.keys(stamina.baseStamina).length, 6);
+test('all seven configured two-stamina characters may enter two teams, but not three', () => {
+  assert.equal(Object.keys(stamina.baseStamina).length, 7);
   assert.equal(stamina.baseStamina['1110'], 2);
   for (const id of Object.keys(stamina.baseStamina)) {
     const plan = structuredClone(example);

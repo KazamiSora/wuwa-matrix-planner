@@ -33,6 +33,8 @@ async function openFixture(library, mirror) {
   return { context, page, errors, rawLibrary };
 }
 const storedLibrary = page => page.evaluate(key => JSON.parse(localStorage.getItem(key)), storageKey);
+// Old plans gain an empty per-plan disable list; their existing fields stay intact.
+const withDisabledDefaults = plan => ({ ...clone(plan), config: { ...clone(plan.config), disabledCharacterIds: [] } });
 try {
   const oldMarker = nextSeason(); oldMarker.scoreMarker = 3319871.4097265;
   const markerLibrary = libraryWith(oldMarker);
@@ -44,7 +46,7 @@ try {
       assert.equal(saved.activePlanId, markerLibrary.activePlanId);
       assert.equal(saved.plans[0].config.scoreMarker, null);
       assert.deepEqual(saved.plans[0].config.teams, oldMarker.teams);
-      assert.deepEqual(saved.plans[1], markerLibrary.plans[1]);
+      assert.deepEqual(saved.plans[1], withDisabledDefaults(markerLibrary.plans[1]));
       assert.equal(await page.evaluate(key => localStorage.getItem(`${key}-restore-backup`), storageKey), rawLibrary);
       assert.equal(await page.locator('#restore-warning').isVisible(), false);
       assert.match(await page.locator('#toast').textContent(), /已移除.*旧目标标记/);
@@ -62,7 +64,7 @@ try {
       assert.equal(saved.plans.length, 2);
       assert.equal(saved.plans[0].config.maxRound, 2);
       assert.deepEqual(saved.plans[0].config.teams, oldRoundOne.teams);
-      assert.deepEqual(saved.plans[1], library.plans[1]);
+      assert.deepEqual(saved.plans[1], withDisabledDefaults(library.plans[1]));
       assert.equal(await page.locator('#max-round').inputValue(), '2');
       assert.equal(await page.evaluate(key => localStorage.getItem(`${key}-restore-backup`), storageKey), rawLibrary);
       assert.equal(await page.locator('#restore-warning').isVisible(), false);

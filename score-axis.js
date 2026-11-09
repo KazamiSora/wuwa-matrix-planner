@@ -1,3 +1,16 @@
+export function parseScoreInput(input) {
+  const text = String(input ?? '').trim();
+  if (!text || text.length > 100) return NaN;
+  const match = /^([+-]?)(\d+(?:\.\d*)?|\.\d+)(?:e([+-]?\d+))?\s*([kwm]?)$/i.exec(text);
+  if (!match) return NaN;
+  const [whole, fraction = ''] = match[2].split('.');
+  const digits = (whole || '0') + fraction;
+  const shift = Number(match[3] || 0) + ({ k: 3, w: 4, m: 6 }[match[4].toLowerCase()] || 0) - fraction.length;
+  if (!Number.isSafeInteger(shift) || Math.abs(shift) > 1000) return NaN;
+  const value = Number(`${match[1]}${digits}e${shift}`);
+  return Number.isFinite(value) && !(value === 0 && /[1-9]/.test(digits)) ? value : NaN;
+}
+
 export function visibleWaves(records, maxRound) {
   return records.filter(wave => wave.round <= maxRound);
 }
@@ -210,11 +223,13 @@ export function validateConfig(value, characterIds, records, identityById = new 
   if (!Number.isInteger(value.maxRound) || value.maxRound < 1) throw new Error(`显示轮次须为 1—${maxRound}`);
   if (!Number.isFinite(value.pixelsPerPoint) || value.pixelsPerPoint <= 0 || value.pixelsPerPoint > MAX_ZOOM) throw new Error('缩放范围无效');
   if (!Array.isArray(value.teams) || value.teams.length > 40) throw new Error('队伍数量须为 0—40');
+  if (value.disabledCharacterIds !== undefined && (!Array.isArray(value.disabledCharacterIds) || value.disabledCharacterIds.some(id => typeof id !== 'string' || !characterIds.has(id)) || new Set(value.disabledCharacterIds).size !== value.disabledCharacterIds.length)) throw new Error('禁用角色配置无效');
   if (value.scoreMarker != null && (!Number.isFinite(value.scoreMarker) || value.scoreMarker < 0 || value.scoreMarker > (matrix.scoreReady ? records.at(-1).cumulative_points_after : Number.MAX_SAFE_INTEGER))) throw new Error('目标总分标记超出已导入的分数范围');
   const total = matrix.scoreReady ? visibleWaves(records, Math.min(value.maxRound, maxRound)).at(-1).cumulative_points_after : Number.MAX_SAFE_INTEGER;
   const ids = new Set();
   const usedCharacters = new Map();
-  const limits = staminaLimits(staminaRules, value.staminaSeason, identityById);
+  const staminaSeason = value.staminaSeason || matrix.id;
+  const limits = staminaLimits(staminaRules, staminaSeason, identityById);
   let combinedScore = 0;
   for (const team of value.teams) {
     if (typeof team.id !== 'string' || !team.id || ids.has(team.id)) throw new Error('队伍 ID 须唯一');
@@ -232,6 +247,8 @@ export function validateConfig(value, characterIds, records, identityById = new 
       if (!options.allowStaminaConflicts && count > (limits.get(identity) || staminaRules?.defaultStamina || 1)) throw new Error('角色体力不足，不能重复上阵到更多队伍');
       usedCharacters.set(identity, count);
     }
+    if (Object.hasOwn(team, 'needsScore') && typeof team.needsScore !== 'boolean') throw new Error('待填分数标记须为布尔值');
+    if (team.needsScore === true && team.score !== 0) throw new Error('待填分数的队伍分数须为 0');
     const awaitingScore = team.needsScore === true && team.score === 0;
     if (!Number.isFinite(team.score) || team.score < 0 || (!awaitingScore && team.score === 0) || team.score > total || !Number.isFinite(team.startScore) || team.startScore < 0 || team.startScore + team.score > total + 1e-7) throw new Error('队伍分数或起点超出当前血线轴');
     if (!/^#[\da-f]{6}$/i.test(team.color)) throw new Error('队伍颜色格式无效');
@@ -243,7 +260,7 @@ export function validateConfig(value, characterIds, records, identityById = new 
   normalized.matrixSeason = matrix.id;
   normalized.matrixVersion = matrix.name;
   normalized.pixelsPerPoint = Math.max(MIN_ZOOM, normalized.pixelsPerPoint);
-  if (staminaRules) normalized.staminaSeason = value.staminaSeason || matrix.id;
+  if (staminaRules) normalized.staminaSeason = staminaSeason;
   normalized.teams = packTeams(normalized.teams);
   if (matrix.scoreReady && normalized.scoreMarker != null) normalized.maxRound = Math.max(normalized.maxRound, records.find(wave => wave.cumulative_points_after >= normalized.scoreMarker).round);
   return normalized;

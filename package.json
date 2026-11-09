@@ -1,12 +1,12 @@
 {
   "name": "wuwa-matrix-hp-planner",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "鸣潮终焉矩阵血线与队伍分数排布工具",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test tests/score-axis.test.mjs tests/stamina-conflicts.test.mjs tests/plan-library.test.mjs tests/plan-delete.test.mjs tests/matrix-content.test.mjs tests/season-config.test.mjs",
+    "test": "node --test tests/score-axis.test.mjs tests/stamina-conflicts.test.mjs tests/plan-library.test.mjs tests/plan-delete.test.mjs tests/matrix-content.test.mjs tests/season-config.test.mjs tests/server.test.mjs tests/score-input.test.mjs",
     "build:win": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/build_release.ps1"
   }
 }

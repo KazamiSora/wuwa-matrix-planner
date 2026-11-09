@@ -54,6 +54,39 @@ test('the reverse switch reports two Lucilla teams, while the correct version re
   assert.deepEqual(conflicts[0].teams.map(team => team.id), ['team-1', 'team-2']);
 });
 
+test('an S2-4 plan without a stamina period accepts its own two-stamina character', () => {
+  const plan = repeatedCharacter('1109', 's2-phase4');
+  plan.towerId = 18;
+  plan.matrixSeason = 's2-phase4';
+  delete plan.staminaSeason;
+  const before = structuredClone(plan);
+  const normalized = validate(plan);
+  assert.equal(normalized.staminaSeason, 's2-phase4');
+  assert.deepEqual(staminaConflicts(normalized.teams, rules, normalized.staminaSeason, identities), []);
+  assert.deepEqual(plan, before);
+});
+
+test('an S2-4 plan without a stamina period rejects the S2-3-only bonus', () => {
+  const plan = repeatedCharacter('1509', 's2-phase3');
+  plan.towerId = 18;
+  plan.matrixSeason = 's2-phase4';
+  delete plan.staminaSeason;
+  assert.throws(() => validate(plan), /体力不足/);
+  const recovered = validate(plan, { allowStaminaConflicts: true });
+  assert.equal(recovered.staminaSeason, 's2-phase4');
+  assert.equal(staminaConflicts(recovered.teams, rules, recovered.staminaSeason, identities).length, 1);
+});
+
+test('an explicit stamina period can still differ from the matrix period', () => {
+  const plan = repeatedCharacter('1509', 's2-phase3');
+  plan.towerId = 18;
+  plan.matrixSeason = 's2-phase4';
+  const normalized = validate(plan);
+  assert.equal(normalized.matrixSeason, 's2-phase4');
+  assert.equal(normalized.staminaSeason, 's2-phase3');
+  assert.deepEqual(staminaConflicts(normalized.teams, rules, normalized.staminaSeason, identities), []);
+});
+
 test('all conflicts are returned when more than one character loses available stamina', () => {
   const plan = repeatedCharacter('1509', 's2-phase3');
   plan.teams[0].characterIds[1] = '1505';
@@ -81,6 +114,40 @@ test('unscored quick teams consume stamina and remain in the conflict team list'
   const recovered = validate(plan, { allowStaminaConflicts: true });
   assert.equal(recovered.teams[1].needsScore, true);
   assert.equal(recovered.teams[1].score, 0);
+});
+
+test('a team awaiting a score cannot retain positive points during import or recovery', () => {
+  const plan = structuredClone(example);
+  plan.teams[0].needsScore = true;
+  for (const options of [{}, { allowStaminaConflicts: true }]) {
+    assert.throws(() => validate(plan, options), /待填分数/);
+  }
+  plan.teams[0].needsScore = false;
+  assert.equal(validate(plan).teams[0].score, 8000);
+});
+
+test('the pending-score flag rejects non-boolean values during import and recovery', () => {
+  for (const value of ['false', 'true', 1, 0, null, {}, [], undefined]) {
+    const plan = structuredClone(example);
+    plan.teams[0].needsScore = value;
+    for (const options of [{}, { allowStaminaConflicts: true }]) {
+      assert.throws(() => validate(plan, options), /待填分数标记须为布尔值/);
+    }
+  }
+});
+
+test('the pending-score flag permits absent or false with points, and true with zero', () => {
+  const plan = structuredClone(example);
+  assert.equal(validate(plan).teams[0].score, 8000);
+  plan.teams[0].needsScore = false;
+  assert.equal(validate(plan).teams[0].score, 8000);
+  plan.teams[0].needsScore = true;
+  plan.teams[0].score = 0;
+  plan.teams = packTeams(plan.teams);
+  const normalized = validate(plan);
+  assert.equal(normalized.teams[0].needsScore, true);
+  assert.equal(normalized.teams[0].score, 0);
+  assert.equal(normalized.teams[1].startScore, 0);
 });
 
 test('editing an affected roster or deleting its team resolves the conflict', () => {

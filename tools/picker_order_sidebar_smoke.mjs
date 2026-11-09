@@ -9,7 +9,7 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1050 } });
 const errors = []; page.on('pageerror', error => errors.push(error.message));
 const config = () => page.evaluate(() => { const library = JSON.parse(localStorage.getItem('wuwa-matrix-plan-library-v1')); return library.plans.find(plan => plan.id === library.activePlanId).config; });
 const names = () => page.locator('.character-choice').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label')));
-const prefix = '守岸人|莫宁|穗穗|维里奈|卜灵|白芷|心|锁暝|清宵|达妮娅|陆·赫斯|秧秧·玄翎|千咲|露西|丽贝卡|绯雪|洛瑟菈|西格莉卡|仇远|爱弥斯|琳奈|嘉贝莉娜|露帕|景燃|长离|布兰特|安可|奥古斯塔|尤诺|鉴心|弗洛洛|坎特蕾拉|洛可可|椿|卡提希娅|夏空|赞妮|菲比|珂莱塔|折枝|相里要|吟霖|卡卡罗|今汐|渊武'.split('|');
+const prefix = '守岸人|莫宁|穗穗|莉莉|维里奈|卜灵|白芷|心|锁暝|清宵|达妮娅|陆·赫斯|秧秧·玄翎|千咲|露西|丽贝卡|绯雪|洛瑟菈|西格莉卡|仇远|爱弥斯|琳奈|嘉贝莉娜|露帕|景燃|长离|布兰特|安可|奥古斯塔|尤诺|鉴心|弗洛洛|坎特蕾拉|洛可可|椿|卡提希娅|夏空|赞妮|菲比|珂莱塔|折枝|相里要|吟霖|卡卡罗|今汐|渊武'.split('|');
 async function moveFirst() {
   const node = page.locator('.team-card').first(); await node.scrollIntoViewIfNeeded();
   const box = await node.boundingBox();

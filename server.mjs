@@ -19,8 +19,12 @@ const server = http.createServer(async (request, response) => {
     const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
     const file = path.resolve(root, relative);
     const inside = file.startsWith(root + path.sep);
+    // Match the filesystem path, including Windows separators and case folding.
+    const resolvedRelative = path.relative(root, file).split(path.sep).join('/');
+    const privatePath = process.platform === 'win32' ? resolvedRelative.toLowerCase() : resolvedRelative;
+    const rawFile = privatePath === 'data/raw' || privatePath.startsWith('data/raw/');
     const publicFile = allowed.has(relative) || ['assets/', 'data/', 'config/'].some(prefix => relative.startsWith(prefix));
-    if (!inside || !publicFile || relative.includes('..') || relative.startsWith('data/raw/')) {
+    if (!inside || !publicFile || relative.includes('..') || rawFile) {
       response.writeHead(404).end('Not found'); return;
     }
     const info = await stat(file);

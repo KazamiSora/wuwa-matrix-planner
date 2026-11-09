@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const { chromium } = await import(pathToFileURL(path.join(os.homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs')).href);
+const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true });
+const page = await browser.newPage();
+const url = process.env.MATRIX_URL || 'http://127.0.0.1:4173';
+const library = () => page.evaluate(() => JSON.parse(localStorage.getItem('wuwa-matrix-plan-library-v1')));
+async function disable(name) { await page.locator('#manage-disabled-characters').click(); await page.getByRole('button',{name:`禁用${name}`,exact:true}).click(); await page.locator('#save-disabled-characters').click(); }
+try {
+  await page.goto(url); await page.locator('.team-card').first().waitFor();
+  const before = await library(), a = before.activePlanId, b = before.plans.find(plan=>plan.id!==a).id;
+  await disable('今汐'); const afterA = await library();
+  assert.deepEqual(afterA.plans.find(plan=>plan.id===b),before.plans.find(plan=>plan.id===b));
+  assert.deepEqual(afterA.plans.find(plan=>plan.id===a).config.disabledCharacterIds,['1304']);
+  assert.equal(afterA.plans.find(plan=>plan.id===a).config.teams.length,2);
+  await page.locator('#plan-select').selectOption(b);
+  await page.locator('#quick-team').click(); await page.locator('#character-search').fill('jinxi');
+  assert.equal(await page.locator('.character-choice').count(),1); await page.keyboard.press('Escape');
+  await disable('长离'); const afterB=await library();
+  assert.deepEqual(afterB.plans.find(plan=>plan.id===a),afterA.plans.find(plan=>plan.id===a));
+  await page.reload(); await page.locator('.team-card').first().waitFor();
+  assert.deepEqual(await library(),afterB);
+  await page.locator('#plan-select').selectOption(a); await page.locator('#duplicate-plan').click(); await page.locator('#confirm-plan').click();
+  const copied=await library(); assert.deepEqual(copied.plans.find(plan=>plan.id===copied.activePlanId).config.disabledCharacterIds,['1304']);
+  await page.locator('#manage-disabled-characters').click(); await page.locator('#enable-all-characters').click(); await page.locator('#save-disabled-characters').click();
+  assert.deepEqual((await library()).plans.find(plan=>plan.id===a).config.disabledCharacterIds,['1304']);
+  const importing=afterA.plans.find(plan=>plan.id===a).config;
+  await page.locator('#import-file').setInputFiles({name:'scoped.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(importing))});
+  await page.waitForFunction(()=>JSON.parse(localStorage.getItem('wuwa-matrix-plan-library-v1')).plans.length===4);
+  const imported=await library(); assert.deepEqual(imported.plans.find(plan=>plan.id===imported.activePlanId).config.disabledCharacterIds,['1304']);
+  await page.locator('#new-plan').click(); await page.locator('#plan-name').fill('空白独立设置'); await page.locator('#confirm-plan').click();
+  await page.reload(); await page.locator('#quick-team').waitFor();
+  await page.locator('#quick-team').click(); await page.locator('#character-search').fill('jinxi'); assert.equal(await page.locator('.character-choice').count(),1); await page.keyboard.press('Escape');
+  const template=JSON.parse(await readFile('config/demo.json','utf8'));
+  const old={version:1,activePlanId:'A',plans:[{id:'A',name:'旧A',config:structuredClone(template)},{id:'B',name:'旧B',config:structuredClone(template)}]};
+  const damaged=structuredClone(old);
+  for(const plan of damaged.plans){plan.config.teams=plan.config.teams.filter(team=>!team.characterIds.includes('1304'));let offset=0;for(const team of plan.config.teams){team.startScore=offset;offset+=team.score;}}
+  const migration=await browser.newPage();
+  await migration.addInitScript(({old,damaged})=>{if(!localStorage.getItem('test-seeded')){localStorage.setItem('test-seeded','1');localStorage.setItem('wuwa-matrix-plan-library-v1',JSON.stringify(damaged));localStorage.setItem('wuwa-matrix-plan-library-v1-before-character-disable',JSON.stringify(old));localStorage.setItem('wuwa-matrix-disabled-characters-v1','["1304"]');}}, {old,damaged});
+  await migration.goto(url); await migration.locator('.team-card').first().waitFor();
+  const recovered=await migration.evaluate(()=>JSON.parse(localStorage.getItem('wuwa-matrix-plan-library-v1')));
+  assert.deepEqual(recovered.plans[0].config.teams,damaged.plans[0].config.teams);
+  assert.deepEqual(recovered.plans[1].config.teams,old.plans[1].config.teams);
+  assert.deepEqual(recovered.plans.map(plan=>plan.config.disabledCharacterIds),[['1304'],[]]);
+  assert.match(await migration.locator('#disabled-removal-notice').innerText(),/恢复.*1 支队伍/);
+  await migration.reload(); await migration.locator('.team-card').first().waitFor();
+  assert.deepEqual(await migration.evaluate(()=>JSON.parse(localStorage.getItem('wuwa-matrix-plan-library-v1'))),recovered);
+  await migration.close();
+  console.log('PASS: per-plan disable/delete isolation, persistence, copy/import/new-plan behavior, and safe one-time restoration of exact legacy cross-plan deletion.');
+} finally { await browser.close(); }

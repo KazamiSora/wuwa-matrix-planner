@@ -192,7 +192,7 @@ try {
     plan.teams[0].characterIds[2] = id; plan.teams[1].characterIds[2] = id; plan.teams[2].characterIds[2] = '1507';
     return plan;
   }
-  for (const [id, name] of [['1505', '守岸人'], ['1503', '维里奈'], ['1103', '白芷'], ['1307', '卜灵'], ['1209', '莫宁'], ['1110', '穗穗']]) {
+  for (const [id, name] of [['1505', '守岸人'], ['1503', '维里奈'], ['1103', '白芷'], ['1307', '卜灵'], ['1209', '莫宁'], ['1110', '穗穗'], ['1512', '莉莉']]) {
     await loadPlan(repeated(id));
     await page.locator('.team-card[data-id="team-3"]').click();
     await page.locator('.character-slot').first().click();

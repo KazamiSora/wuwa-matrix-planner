@@ -10,6 +10,8 @@
 
 漂泊者组合头像由原男女头像制作并经作者确认，用于合并同属性的性别选项；相关游戏人物与原素材的权利仍归原权利人。
 
+莉莉头像由作者提供的角色介绍图片抠图制作，文件为 `assets/characters/Lily_UserPortrait_v1.png`，来源说明与哈希保存在角色清单中。相关游戏人物与原素材的权利仍归原权利人。
+
 ## Node.js
 
 Windows 便携版附带 Node.js v24.22.1 Windows x64 运行时，源项目为 [nodejs/node](https://github.com/nodejs/node)。完整许可证随便携包放在 `runtime/LICENSE.node.txt`，包含其第三方依赖的通知。

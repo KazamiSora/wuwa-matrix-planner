@@ -27,6 +27,10 @@ OMITTED_PARTS = {
     'raw', 'runtime', 'outputs', 'build', 'dist',
 }
 REQUIRED_FILES = {
+    'assets/characters/Lily_UserPortrait_v1.png', 'tests/score-input.test.mjs',
+    'tests/server.test.mjs', 'tests/test_season_generation.py', 'tools/lily_smoke.mjs',
+    'tools/input_visibility_filters_smoke.mjs', 'tools/disable_cleanup_egg_smoke.mjs',
+    'tools/guaranteed_roles_smoke.mjs', 'tools/disabled_plan_scope_smoke.mjs',
     'plan-library.js', 'season-config.js', 'config/seasons.json',
     'config/seasons/s2-3.json', 'config/seasons/s2-4.json',
     'data/matrix_content_16.json', 'data/matrix_content_18.json',

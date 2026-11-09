@@ -3,9 +3,33 @@
   "source": "用户指定的基础体力与各期临时体力规则",
   "defaultSeason": "s2-phase3",
   "defaultStamina": 1,
-  "baseStamina": { "1505": 2, "1503": 2, "1103": 2, "1307": 2, "1209": 2, "1110": 2 },
+  "baseStamina": {
+    "1505": 2,
+    "1503": 2,
+    "1103": 2,
+    "1307": 2,
+    "1209": 2,
+    "1110": 2,
+    "1512": 2
+  },
   "seasons": [
-    { "id": "s2-phase3", "name": "终焉矩阵S2-3（S2第三阶段）", "towerId": 16, "bonusCharacterIds": ["1509"], "extraStamina": 1 },
-    { "id": "s2-phase4", "name": "终焉矩阵S2-4（S2第四阶段）", "towerId": 18, "bonusCharacterIds": ["1109"], "extraStamina": 1 }
+    {
+      "id": "s2-phase3",
+      "name": "终焉矩阵S2-3（S2第三阶段）",
+      "towerId": 16,
+      "bonusCharacterIds": [
+        "1509"
+      ],
+      "extraStamina": 1
+    },
+    {
+      "id": "s2-phase4",
+      "name": "终焉矩阵S2-4（S2第四阶段）",
+      "towerId": 18,
+      "bonusCharacterIds": [
+        "1109"
+      ],
+      "extraStamina": 1
+    }
   ]
 }

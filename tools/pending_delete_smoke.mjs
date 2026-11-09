@@ -29,6 +29,15 @@ async function manualPending() {
   await page.locator('#add-team').click();
   for (const name of ['今汐', '长离', '守岸人']) await page.getByRole('button', { name, exact: true }).click();
   assert.equal(await page.locator('#dialog-team-score').inputValue(), '');
+  const before = await config();
+  // Incomplete scientific notation must remain invalid rather than becoming a pending score.
+  await page.locator('#dialog-team-score').pressSequentially('1e');
+  assert.match(await page.locator('#dialog-team-score').inputValue(), /^1e(?:309)?$/);
+  await page.locator('#confirm-characters').click();
+  assert.equal(await page.locator('#character-dialog').isVisible(), true);
+  assert.match(await page.locator('#character-feedback').innerText(), /大于 0/);
+  assert.deepEqual(await config(), before);
+  await page.locator('#dialog-team-score').fill('');
   await page.locator('#confirm-characters').click();
   assert.equal(await page.locator('#character-dialog').isVisible(), false);
   return (await config()).teams.at(-1).id;
@@ -71,7 +80,22 @@ try {
     for (const field of ['axisScore', 'axisStartScore', 'positionIsPreview']) assert.ok(!(field in team));
   }
   await assertContiguous();
-  await bar(manual).dblclick(); await page.locator('#dialog-team-score').fill('7000'); await page.locator('#confirm-characters').click();
+  await selectTeam(manual);
+  const beforeInvalidSidebarScore = await config();
+  await page.locator('#team-score').pressSequentially('1e');
+  assert.equal(await page.locator('#team-score').inputValue(), '1e');
+  await page.locator('#apply-team').click();
+  assert.deepEqual(await config(), beforeInvalidSidebarScore);
+  assert.equal(await page.locator('#team-score').inputValue(), '1e');
+  await bar(manual).dblclick();
+  const beforeInvalidEdit = await config();
+  await page.locator('#dialog-team-score').pressSequentially('1e309');
+  assert.match(await page.locator('#dialog-team-score').inputValue(), /^1e(?:309)?$/);
+  await page.locator('#confirm-characters').click();
+  assert.equal(await page.locator('#character-dialog').isVisible(), true);
+  assert.match(await page.locator('#character-feedback').innerText(), /大于 0/);
+  assert.deepEqual(await config(), beforeInvalidEdit);
+  await page.locator('#dialog-team-score').fill('7000'); await page.locator('#confirm-characters').click();
   assert.equal(await bar(manual).getAttribute('data-axis-score'), '7000');
   assert.equal(await bar(manual).evaluate(node => node.classList.contains('pending-score-bar')), false);
   assert.equal((await exported()).teams.find(team => team.id === manual).needsScore, undefined);
@@ -154,5 +178,5 @@ try {
   await assertContiguous();
   assert.ok((await exported()).teams.every(team => team.score === 0 && team.needsScore));
   assert.deepEqual(errors, []);
-  console.log('PASS: 5000-point manual/quick pending previews, clean JSON, fill/reorder/fit/overflow; two-step deletion undo/redo, edited survivor and pending recovery, isolated plan histories, reset and mobile.');
+  console.log('PASS: invalid optional numbers rejected without changing drafts; 5000-point manual/quick pending previews, clean JSON, fill/reorder/fit/overflow; two-step deletion undo/redo, edited survivor and pending recovery, isolated plan histories, reset and mobile.');
 } finally { await browser.close(); }
