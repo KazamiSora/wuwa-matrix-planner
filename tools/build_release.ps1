@@ -20,7 +20,9 @@ if (-not (Test-Path -LiteralPath $licenseSource -PathType Leaf)) { throw 'Missin
 $compiler = Join-Path $env:SystemRoot 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if (-not (Test-Path -LiteralPath $compiler)) { throw '.NET Framework C# compiler not found.' }
 $launcher = Join-Path $releaseRoot '终焉矩阵血线排布.exe'
-& $compiler /nologo /codepage:65001 /target:winexe /platform:x64 /optimize+ "/out:$launcher" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll (Join-Path $projectRoot 'desktop\Launcher.cs')
+$appIcon = Join-Path $projectRoot 'assets\app\lily.ico'
+if (-not (Test-Path -LiteralPath $appIcon -PathType Leaf)) { throw 'Missing app icon: assets/app/lily.ico' }
+& $compiler /nologo /codepage:65001 /target:winexe /platform:x64 /optimize+ "/win32icon:$appIcon" "/out:$launcher" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll (Join-Path $projectRoot 'desktop\Launcher.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Launcher compilation failed.' }
 foreach ($name in @('index.html','app.js','styles.css','score-axis.js','plan-library.js','season-config.js','server.mjs','package.json','README.md','THIRD_PARTY_NOTICES.md','CHANGELOG.md')) {
     Copy-Item -LiteralPath (Join-Path $projectRoot $name) -Destination (Join-Path $releaseRoot $name) -Force

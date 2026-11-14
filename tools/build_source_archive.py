@@ -20,13 +20,14 @@ TREE_TYPES = {
     'config': {'.json'}, 'docs': {'.md'}, 'tests': {'.mjs', '.py'},
     'tools': {'.mjs', '.py', '.ps1'},
 }
-ASSET_DIRECTORIES = ('bosses', 'characters', 'circuits', 'elements')
-ASSET_TYPES = {'.webp', '.png', '.jpg', '.jpeg', '.svg'}
+ASSET_DIRECTORIES = ('app', 'bosses', 'characters', 'circuits', 'elements')
+ASSET_TYPES = {'.webp', '.png', '.jpg', '.jpeg', '.svg', '.ico'}
 OMITTED_PARTS = {
     '.git', '.codex', '.agents', '__pycache__', 'node_modules',
     'raw', 'runtime', 'outputs', 'build', 'dist',
 }
 REQUIRED_FILES = {
+    'assets/app/lily.png', 'assets/app/lily.ico',
     'assets/characters/Lily_UserPortrait_v1.png', 'tests/score-input.test.mjs',
     'tests/server.test.mjs', 'tests/test_season_generation.py', 'tools/lily_smoke.mjs',
     'tools/input_visibility_filters_smoke.mjs', 'tools/disable_cleanup_egg_smoke.mjs',

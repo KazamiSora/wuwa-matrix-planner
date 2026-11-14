@@ -1,6 +1,6 @@
 {
   "name": "wuwa-matrix-hp-planner",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "鸣潮终焉矩阵血线与队伍分数排布工具",
   "private": true,
   "type": "module",

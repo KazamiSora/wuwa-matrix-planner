@@ -11,13 +11,14 @@ using System.Reflection;
 
 [assembly: AssemblyTitle("终焉矩阵血线排布")]
 [assembly: AssemblyProduct("Wuwa Matrix Planner")]
-[assembly: AssemblyVersion("0.3.0.0")]
-[assembly: AssemblyFileVersion("0.3.0.0")]
+[assembly: AssemblyVersion("0.3.1.0")]
+[assembly: AssemblyFileVersion("0.3.1.0")]
 
 internal static class Launcher {
     private static readonly string Root = AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
     private static Process ownedServer;
     private static NotifyIcon tray;
+    private static Icon appIcon;
     private static string url;
     private static bool headless;
 
@@ -65,8 +66,9 @@ internal static class Launcher {
             if (ownedServer == null) return 0;
             if (!headless) {
                 tray = new NotifyIcon();
-                tray.Icon = SystemIcons.Application;
-                tray.Text = "终焉矩阵血线排布 V0.3";
+                appIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+                tray.Icon = appIcon ?? SystemIcons.Application;
+                tray.Text = "终焉矩阵血线排布 V0.3.1";
                 var menu = new ContextMenuStrip();
                 menu.Items.Add("打开软件", null, delegate { OpenWindow(); });
                 menu.Items.Add("退出软件", null, delegate { Application.Exit(); });
@@ -77,10 +79,11 @@ internal static class Launcher {
             Application.Run();
             return 0;
         } catch (Exception error) {
-            if (!headless) MessageBox.Show(error.Message, "终焉矩阵血线排布 V0.3", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            if (!headless) MessageBox.Show(error.Message, "终焉矩阵血线排布 V0.3.1", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         } finally {
             if (tray != null) { tray.Visible = false; tray.Dispose(); }
+            if (appIcon != null) appIcon.Dispose();
             StopOwnedServer();
         }
     }
@@ -100,7 +103,7 @@ internal static class Launcher {
     private static bool Matches(Dictionary<string, object> status) {
         return status != null && status.ContainsKey("app") && Convert.ToString(status["app"]) == "wuwa-matrix-hp-planner"
             && status.ContainsKey("root") && String.Equals(Convert.ToString(status["root"]).TrimEnd(Path.DirectorySeparatorChar), Root, StringComparison.OrdinalIgnoreCase)
-            && status.ContainsKey("version") && Convert.ToString(status["version"]) == "0.3.0";
+            && status.ContainsKey("version") && Convert.ToString(status["version"]) == "0.3.1";
     }
 
     private static bool IsPortBusy(int port) {
