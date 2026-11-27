@@ -283,9 +283,9 @@ export function libraryEntry(items,raw,key){
 // The ID "sample" belonged to the built-in slot; explicitly imported projects have independent IDs.
 export async function refreshBundledProject(){
   const key='afyg-project-library-v1',text=localStorage.getItem(key);
-  if(!text)return null;
+  if(text===null)return null;
   const saved=JSON.parse(text);
-  if(!Array.isArray(saved?.items))throw Error('椰果工程库格式无效');
+  if(!Array.isArray(saved?.items) || saved.items.some(item=>!item?.id || !item.raw))throw Error('椰果工程库格式无效');
   const old=saved.items.find(item=>item.id==='sample');
   const stale=item=>item?.id==='sample' && (item.raw?.project??item.raw)?.id==='03e22bfc-fb56-4088-b1f3-f01691c01ccb';
   if(!stale(old) && !stale(saved.lastDeletion?.item))return saved;

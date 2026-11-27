@@ -3,9 +3,9 @@
 <link rel="stylesheet" href="/replay.css">
 <link rel="stylesheet" href="/calculation-overlay.css">
 <div class="project-layout">
-<aside class="project-sidebar"><h2>我的队伍</h2><label class="button import-project">＋ 导入椰果 JSON<input id="file" type="file" accept=".json,application/json"></label><nav id="team-library" aria-label="选择队伍"></nav>
+<aside class="project-sidebar"><h2>我的队伍</h2><label class="button import-project">＋ 导入椰果 JSON<input id="file" type="file" accept=".json,application/json" disabled></label><nav id="team-library" aria-label="选择队伍"></nav>
 <div class="library-actions"><button id="delete-project" class="danger" disabled>删除所选工程</button><button id="undo-project" disabled>撤回删除</button></div>
-<p id="project-notice" role="status"></p><button id="sample">载入绯洛穗样例</button><p id="library-status" role="status"></p></aside>
+<p id="project-notice" role="status"></p><button id="sample" disabled>载入绯洛穗样例</button><p id="library-status" role="status"></p><button id="retry-library" hidden>重新读取工程库</button></aside>
 <dialog id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-description"><form method="dialog">
 <h2 id="delete-title">删除椰果工程？</h2><p id="delete-description"></p>
 <div class="library-actions"><button value="cancel" autofocus>取消</button><button class="danger" value="delete">确认删除</button></div></form></dialog>

@@ -64,16 +64,7 @@ function showEquipment(team, config, profile){
 }
 
 const libraryKey='afyg-project-library-v1';
-let library=[],activeId=null,lastDeletion=null,hasSavedLibrary=false;
-try{
-  const saved=await refreshBundledProject();
-  if(Array.isArray(saved?.items)){
-    hasSavedLibrary=true;
-    library=saved.items.filter(item=>item?.id&&item.raw);
-    activeId=saved.activeId;
-    if(saved.lastDeletion?.item?.raw && saved.lastDeletion.item.id && Number.isInteger(saved.lastDeletion.index))lastDeletion=saved.lastDeletion;
-  }
-}catch{}
+let library=[],activeId=null,lastDeletion=null;
 function persistLibrary(){
   try{localStorage.setItem(libraryKey,JSON.stringify({items:library,activeId,lastDeletion}));$('library-status').textContent='';}
   catch{$('library-status').textContent='浏览器空间不足，队伍仅在本次打开期间保留。';}
@@ -419,11 +410,26 @@ $('export').onclick=()=>{
   frame.contentWindow.postMessage({type:'fast-calc:request-state',requestId:exportRequest},location.origin);
 };
 async function startTeamView(){
+  let saved;
+  try {
+    saved = await refreshBundledProject();
+  } catch (error) {
+    $('library-status').textContent = '工程库读取失败，已保留原始数据。' + error.message;
+    $('retry-library').hidden = false;
+    $('retry-library').onclick = () => location.reload();
+    return;
+  }
+  if (saved) {
+    library = saved.items;
+    activeId = saved.activeId;
+    if (saved.lastDeletion?.item?.raw && saved.lastDeletion.item.id && Number.isInteger(saved.lastDeletion.index)) lastDeletion = saved.lastDeletion;
+  }
   try{const response=await fetch('/icons/replay/index.json');if(response.ok)iconMap=await response.json();}catch{}
   const last=library.find(item=>item.id===activeId)??library[0];
   drawLibrary();
+  $('file').disabled = $('sample').disabled = false;
   if(last)await load(async()=>last.edited??last.raw,last.id);
-  else if(hasSavedLibrary)showEmptyLibrary();
+  else if(saved)showEmptyLibrary();
   else $('sample').click();
 }
 startTeamView();
