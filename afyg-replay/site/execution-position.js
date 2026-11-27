@@ -78,16 +78,19 @@ export function inAxisRange(pos,range){
 }
 
 // A "+" reference labels elapsed time since the preceding timed reference.
-export function templateTimes(project,refs){
+export function templateTimes(project,refs,{preferAuthored=false}={}){
   const explicit=new Map((project.analysis?.timings??[]).map(t=>[t.refLineId,t.seconds]));
   const times=new Map();
   let elapsed=0;
   for(const r of refs){
-    const delta=/^\+(\d+(?:\.\d+)?)\s*(?:s\b|秒)/i.exec(r.time||r.name||'');
+    const markerPattern=/^(\+?)(\d+(?:\.\d+)?)\s*(?:s\b|秒)/i;
+    const marker=markerPattern.exec(String(r.time??'').trim()) ?? markerPattern.exec(String(r.name??'').trim());
     const saved=explicit.get(r.id);
     if(r.id==='left')elapsed=0;
-    else if(delta)elapsed+=Number(delta[1]);
+    else if(preferAuthored && Number.isFinite(saved))elapsed=saved;
+    else if(marker?.[1]==='+')elapsed+=Number(marker[2]);
     else if(Number.isFinite(saved)&&saved>elapsed)elapsed=saved;
+    else if(preferAuthored && marker)elapsed=Number(marker[2]);
     else continue;
     times.set(r.id,elapsed);
   }
@@ -130,7 +133,8 @@ export function inspectProjectAxis(project,timeline){
   const namedFull=/120\s*(?:s|秒)|全局轴/i.test(title);
   const override=Object.hasOwn(axisLabels,project.matrixAxisType)?project.matrixAxisType:null;
   const firstLoop=loops.find(r=>opening&&r.pos>opening.pos);
-  const openingSeconds=timings.get(opening?.id),loopSeconds=timings.get(firstLoop?.id)-openingSeconds;
+  const loopTimes=templateTimes(project,refs,{preferAuthored:true});
+  const openingSeconds=loopTimes.get(opening?.id),loopSeconds=loopTimes.get(firstLoop?.id)-openingSeconds;
   const threeFit=openingSeconds>0 && loopSeconds>0 && openingSeconds+3*loopSeconds<=120 && openingSeconds+4*loopSeconds>120;
   const startupMarked=/启动轴/.test(label(opening??{})+' '+title);
   const tail=refs.find(r=>firstLoop && r.pos>firstLoop.pos && /尾轮|末轮|收尾/.test(label(r)));
@@ -153,8 +157,8 @@ export function inspectProjectAxis(project,timeline){
   else if(repeats)reason='参考线同时标出了首轮和循环模板';
   else if(!reason)reason=namedFull?'名称含全局轴或 120 秒，请核对结束位置':'工程已列出首轮和多段后续循环';
   if(kind==='full' && openingAndLoop)reason+='；原轴含首轮和后续循环';
-  const elapsedStart=timings.get(split?.id);
-  const elapsedEnd=timings.get(loopEnd?.id??'right');
+  const elapsedStart=loopTimes.get(split?.id);
+  const elapsedEnd=loopTimes.get(loopEnd?.id??'right');
   let templateSeconds=elapsedStart>0 && elapsedEnd>elapsedStart?elapsedStart+repeats*(elapsedEnd-elapsedStart):null;
   if(closing){
     const times=templateTimes(project,refs);

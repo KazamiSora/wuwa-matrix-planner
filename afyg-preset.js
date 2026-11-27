@@ -62,9 +62,10 @@ export function fullAxisTimes(project,refs){
   return times;
 }
 
-function axisClock(project,timeline,axis){
+function axisClock(project,timeline,axis,repeats=false){
   const refs=[...timeline.refLines].sort((a,b)=>a.pos-b.pos);
-  const timed=(axis.playback?templateTimes(project,refs):axis.cycles===1?fullAxisTimes(project,refs):null)??new Map((project.analysis?.timings??[]).map(t=>[t.refLineId,t.seconds]));
+  const timed=(axis.playback || repeats ? templateTimes(project,refs,{preferAuthored:!axis.playback}) :
+    axis.cycles===1 ? fullAxisTimes(project,refs) : null) ?? new Map((project.analysis?.timings??[]).map(t=>[t.refLineId,t.seconds]));
   const points=[];
   for(const ref of timeline.refLines){
     const label=ref.name||ref.time||'';
@@ -181,7 +182,10 @@ export async function compileProjectPreset(project, roles, seasons){
 async function compileRotation(project, roles, seasons, allowEmpty=false, segment){
   const phase=project.phases??project.encounter;
   const timeline=phase?.timeline?.data;
-  if(allowEmpty && timeline?.damageBlocks?.length===0)return {hits:[],roundSeconds:[axisClock(project,timeline,segment).duration]};
+  const {range,kind,repeats}=inspectProjectAxis(project,timeline);
+  const axis=segment??range;
+  const clock=axisClock(project,timeline,axis,repeats);
+  if(allowEmpty && timeline?.damageBlocks?.length===0)return {hits:[],roundSeconds:[clock.duration]};
   if(!timeline?.damageBlocks?.length)throw Error('工程中没有可推演的伤害块');
   const assets=project.team.flatMap(slot=>[['v3/character',slot.character],['v1/weapon',slot.weapon],...(slot.echoes??[]).filter(e=>e?.name).map(e=>['v1/echo',e.name])]);
   await Promise.all(assets.filter(([,name])=>name).map(async ([route,name])=>{
@@ -205,9 +209,6 @@ async function compileRotation(project, roles, seasons, allowEmpty=false, segmen
   }
   const base=tables.values().next().value;
   const pos=new Map([...timeline.opBlocks,...timeline.refLines].map(anchor=>[anchor.id,anchor.pos]));
-  const {range,kind}=inspectProjectAxis(project,timeline);
-  const axis=segment??range;
-  const clock=axisClock(project,timeline,axis);
   const relativeSecond=pos=>{
     const t=clock.secondsAt(pos);
     return t!==null && clock.begin!==null && t>=clock.begin?t-clock.begin:null;

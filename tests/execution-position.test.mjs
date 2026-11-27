@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {makeRosterChoices} from '../afyg-batch.js';
+import {compileProjectPreset} from '../afyg-preset.js';
 import {repositionExecutions,inspectProjectAxis,verifyEngineDamage,rosterKey,libraryEntry,roundRange,inAxisRange} from '../afyg-replay/site/execution-position.js';
 
 test('1+3+1 uses the ending reference hits once per corresponding segment and keeps the tail once',()=>{
@@ -59,6 +60,22 @@ test('startup ends at 30s and its 28s loop plays three times, preserving other c
   assert.equal(inspectProjectAxis({...project,matrixAxisType:'single'},t).repeats,0);
   project.analysis.timings.push({refLineId:'right',seconds:120});
   assert.equal(inspectProjectAxis(project,t).kind,'full');
+});
+
+test('relative reference times drive both the template audit and each compiled round', async () => {
+  const timeline = {opBlocks: [], damageBlocks: [], refLines: [
+    {id: 'left', pos: 0}, {id: 'a', pos: 10, time: '+30s 启动轴'},
+    {id: 'b', pos: 20, time: '+28s 循环轴'}, {id: 'right', pos: 30}
+  ]};
+  for (const [kind, rounds] of [['startup', [30, 28, 28, 28]], ['opening', [30, 28, 28, 28, 28]]]) {
+    const project = {matrixAxisType: kind, phases: {timeline: {data: timeline}}};
+    const preset = await compileProjectPreset(project, [], []);
+    assert.deepEqual(preset.roundSeconds, rounds);
+    assert.equal(inspectProjectAxis(project, timeline).templateSeconds, rounds.reduce((a, b) => a + b));
+  }
+  assert.equal(inspectProjectAxis({}, timeline).kind, 'startup');
+  const authored = {matrixAxisType: 'startup', analysis: {timings: [{refLineId: 'a', seconds: 31}]}};
+  assert.equal(inspectProjectAxis(authored, timeline).templateSeconds, 115);
 });
 
 test('move separate executions without moving co-bound skills, effects or losing row bindings',()=>{
